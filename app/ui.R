@@ -12,6 +12,7 @@ if (is.null(pastAnalyses)){
 
 shinyUI(
   fluidPage(
+    div(id="mask", class="hidden", img(src="processing.gif"), h3("Building .xlsx file...")),
     useShinyjs(),
     tags$head(
       tags$style(HTML("
@@ -21,6 +22,10 @@ shinyUI(
                       .btn {width: 100%;}
                       body {text-align: justify;}
                       .modal-body>btn {width: 49%;}
+                      .hidden {position: absolute; z-index: 1;}
+                      .overlay {position: absolute; z-index: 3; opacity: 0.85; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; background-color: White; color: Black;}
+                      .overlay>img {position: absolute; top: 50%; left: 50%; width: 200px; height: 200px; margin-top: -100px; margin-left: -100px; opacity: 1;}
+                      .overlay>h3 {position: absolute; top: 50%; left: 50%; width: 200px; height: 200px;; margin-top: 100px; margin-left: -100px; color: Black; opacity: 1; text-align: center}
                       "))
     ),
     
@@ -84,8 +89,7 @@ shinyUI(
         h4("3. Download results:"),
         downloadButton("saveCSVSummary", "Summary Only (.csv)", width="100%"),
         downloadButton("saveCSVProcVals", "Processing Values (.csv)", width="100%"),
-        #downloadButton('saveMSXL', "All Results (.xlsx)", width="100%")#,
-        #downloadButton('saveGraphs', "Graphs Only (.jpg)", icon('download'), width="100%")
+        downloadButton("saveMSXL", "All Results (.xlsx)", width="100%"),
         hr(),
         h4("4. Archive:"),
         selectizeInput("pastSamples", 
@@ -143,7 +147,7 @@ shinyUI(
                                                                        #textOutput("brushText"),
                                                                        actionButton("saveNewTime", 
                                                                                     "Draw on the ratio plot to select a new stability region.",
-                                                                                    icon=icon("floppy-o"))),
+                                                                                    icon=icon("pencil-square"))),
                                                               tabPanel("Values",
                                                                        br(),
                                                                        DT::dataTableOutput("IDAvalues"))
@@ -151,7 +155,7 @@ shinyUI(
                                          ) # Close tabPanel "Quality Overview"
                              ) # Close tabsetPanel "results"
                     ) # Close tabPanel "Results"
-        ) # Close tabsetPanel "main"
+          ) # Close tabsetPanel "main"
       ) # Close mainPanel
     ) # Close sidebarLayout
   ) # Close fluidPage

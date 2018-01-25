@@ -1,11 +1,12 @@
 # Load dependencies
-x <- c("shiny", "tidyverse", "DT", "shinyjs", "xlsx")
+x <- c("shiny", "tidyverse", "DT", "shinyjs", "openxlsx")
 lapply(x, require, character.only = TRUE)
 
 # Version of Isotope Dilution Assistant to use
-source('alpha.R')
+source('IDA_functions.R')
 
 shinyServer(function(session, input, output) {
+  
   # Inputs
   file_selected     <- reactive(input$fn)
   apply_to          <- reactive(input$apply)
@@ -17,7 +18,7 @@ shinyServer(function(session, input, output) {
   expansion_single  <- reactive(input$expansion_single)
   current_sample    <- reactive({
     if (is.null(IDA_result)) {
-      NULL
+      return(NULL)
     } else {
       which(IDA_result$Eval$Sample %in% input$sample)
     }
@@ -26,6 +27,9 @@ shinyServer(function(session, input, output) {
   IDA_result <- NULL
   slide_trigger <- TRUE
   change_archive_list <- TRUE
+  disable("saveCSVSummary")
+  disable("saveCSVProcVals")
+  disable("saveMSXL")
   
   # Main function - generates IDA object on file load
   observeEvent({
@@ -68,6 +72,9 @@ shinyServer(function(session, input, output) {
       slide_trigger <<- !slide_trigger
       redrawit <- redraw() + 1
       redraw(redrawit)
+      enable("saveCSVSummary")
+      enable("saveCSVProcVals")
+      enable("saveMSXL")
     }
   })
   
@@ -126,7 +133,11 @@ shinyServer(function(session, input, output) {
           full_join(IDA_result$Eval, IDA_result$Info)
         }
       })
-      i <- which(IDA_result$Eval$Sample == input$sample)
+      if(input$sample %in% IDA_result$Eval$Sample){
+        i <- which(IDA_result$Eval$Sample == input$sample)
+      } else {
+        i <- 1
+      }
       ii <- dim(IDA_result$Eval)[1] - i + 1
       output$IDAquality <- renderPlot({
         IDA_result$Quality +
@@ -147,7 +158,7 @@ shinyServer(function(session, input, output) {
         } else {
           raw <- as.data.frame(IDA_result$Raw[[current_sample()]])[, -1]
           names(raw) <- gsub("X", "", names(raw))
-          proc <- as.data.frame(IDA_result$Processed[[1]])
+          proc <- as.data.frame(IDA_result$Processed[[current_sample()]])
           names(proc) <- gsub("X", "", names(proc))
           names(proc)[2:3] <- paste(names(proc)[2:3], " corrected")
           x <- data.frame(cbind(proc$Time,
@@ -285,7 +296,7 @@ shinyServer(function(session, input, output) {
       )
       btn_text <-
         paste0("Save ", x_min, "-", x_max, " s as the stability region.")
-      updateActionButton(session, 'saveNewTime', label = btn_text)
+      updateActionButton(session, 'saveNewTime', label = btn_text, icon=icon("floppy-o"))
     }
   })
   
@@ -336,14 +347,22 @@ shinyServer(function(session, input, output) {
           updateTabsetPanel(session,
                             'results',
                             selected = "Details")
+          updateActionButton(session,
+                             'archive',
+                             label = "Archived, click to update",
+                             icon = icon("toggle-on"))
           redrawit <- redraw() + 1
           redraw(redrawit)
+          reset("fn")
+          enable("saveCSVSummary")
+          enable("saveCSVProcVals")
+          enable("saveMSXL")
         }
       }
     }
   })
   
-  # Load an archived analysis from the modal dialog (same code snippet as above)
+  # Load an archived analysis from the modal dialog (same code snippet as above but triggers from modal dialogue)
   observeEvent(input$loadArchive, {
     load(paste0(getwd(), "/archive/", input$pastSamples[1], ".Rdata"))
     IDA_result <<- IDA_result
@@ -358,6 +377,11 @@ shinyServer(function(session, input, output) {
     updateTabsetPanel(session,
                       'results',
                       selected = "Details")
+    updateActionButton(session,
+                       'archive',
+                       label = "Archived, click to update",
+                       icon = icon("toggle-on"))
+    reset("fn")
     removeModal()
     redrawit <- redraw() + 1
     redraw(redrawit)
@@ -387,7 +411,9 @@ shinyServer(function(session, input, output) {
       updateSelectizeInput(session,
                            'pastSamples',
                            choices = pastAnalyses,
-                           selected = selected_archive)
+                           selected = selected_archive, 
+                           options = list(placeholder = "(Select a prior analysis)",
+                                          maxItems = 1))
       change_archive_list <<- !change_archive_list
     }
   })
@@ -414,13 +440,11 @@ shinyServer(function(session, input, output) {
   # Download handlers
   output$saveCSVSummary <- downloadHandler(
     filename = function() {
-      paste(
+      paste0(
         gsub(".csv", "", file_selected()$name),
         " - processed ",
         Sys.Date(),
-        " Summary.csv",
-        sep = ""
-      )
+        " Summary.csv")
     },
     content = function(file) {
       write.csv(
@@ -430,28 +454,15 @@ shinyServer(function(session, input, output) {
         na = "",
         file
       )
-      shinyjs::info(
-        paste(
-          'File "',
-          gsub(".csv", "", file_selected()$name),
-          " - processed ",
-          Sys.Date(),
-          ' Summary.csv"',
-          " has been saved to your Downloads folder.",
-          sep = ""
-        )
-      )
     }
   )
   output$saveCSVProcVals <- downloadHandler(
     filename = function() {
-      paste(
+      paste0(
         gsub(".csv", "", file_selected()$name),
         " - processed ",
         Sys.Date(),
-        " Processing Values.csv",
-        sep = ""
-      )
+        " Processing Values.csv")
     },
     content = function(file) {
       write.csv(
@@ -461,31 +472,29 @@ shinyServer(function(session, input, output) {
         na = "",
         file
       )
-      shinyjs::info(
-        paste(
-          'File "',
-          gsub(".csv", "", file_selected()$name),
-          " - processed ",
-          Sys.Date(),
-          ' Processing Values.csv"',
-          " has been saved to your Downloads folder.",
-          sep = ""
-        )
-      )
     }
   )
-  #output$saveMSXL <- downloadHandler(
-  #  filename = paste(file_selected()$datapath, " - process", Sys.Date(), ".xlsx", sep=""),
-  #  content = function(file) {
-  #    write.xlsx(IDA_result$Eval, file,
-  #               sheetName = "Summary Results")
-  #    write.xlsx(IDA_result$Info, file, append=TRUE,
-  #               sheetName = "Processing Values")
-  #    for (i in 1:length(IDA_result$Graphs)){
-  #       write.xlsx(IDA_result$Raw, file, append=TRUE,
-  #                   sheetName = names(IDA_result$Raw))
-  #   }
-  #    shinyjs::info(paste(filename, "has been saved to your Downloads folder."))
-  #  }
-  #)
-})
+  output$saveMSXL <- downloadHandler(
+    filename = function() {
+      if (is.null(file_selected())){
+        paste0(input$pastSamples, " - processed ", Sys.Date(), ".xlsx")
+      } else {
+        paste0(file_selected()$name, " - processed ", Sys.Date(), ".xlsx")
+      }
+    },
+    content = function(file) {
+      addClass("mask", "overlay")
+      removeClass("mask", "hidden")
+      if (is.null(file_selected())){
+        fname <- paste0(input$pastSamples, " - processed ", Sys.Date(), ".xlsx")
+      } else {
+        fname <- paste0(file_selected()$name, " - processed ", Sys.Date(), ".xlsx")
+      }
+      saveWorkbook(pack_as_excel(IDA_result), fname, overwrite = TRUE)
+      file.copy(fname, file)
+      file.remove(fname)
+      addClass("mask", "hidden")
+      removeClass("mask", "overlay")
+    }
+  )
+}) 

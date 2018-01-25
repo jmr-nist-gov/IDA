@@ -187,6 +187,11 @@ IDA_quality <- function(dat) {
   sd1 <- sd(dat$RSD[-blanks])
   n <- length(dat$Sample)
   samples_over <- dat[-blanks,] %>% filter(RSD > 5) %>% pull(Sample) %>% length()
+  if (samples_over == 1) {
+    samples_over <- paste(samples_over, "sample")
+  } else {
+    samples_over <- paste(samples_over, "samples")
+  }
   dat$Sample <- factor(dat$Sample, levels=rev(levels(dat$Sample)))
   out <-  ggplot(dat, aes(y=Sample, x=RSD))+
     geom_point(colour='white', alpha=0)
@@ -223,7 +228,7 @@ IDA_quality <- function(dat) {
                 vjust=0.5)+
       labs(x="Relative Standard Deviation (%)",
            #title = "Quality Overview for this batch",
-           subtitle = paste(samples_over, "samples over 5% RSD in this set.", sep=" "),
+           subtitle = paste(samples_over, "over 5% RSD in this set.", sep=" "),
            caption = paste("",
                            "Any sample labeled 'blank' is displayed as open blue circles.",
                            "The green region is -/+1sd of measurements.",
@@ -293,4 +298,58 @@ IDA <- function(file_name, buffer = 10, tolerance = 0.1, expansion = 10, draw_st
   mostattributes(out) <- c(attributes(out),
                            "isotopes" = isotopes)
   return(out)
+}
+
+pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE) {
+  wb <- createWorkbook()
+  addWorksheet(wb, "Summary")
+  writeDataTable(wb, 1, IDA_obj$Eval)
+  setColWidths(wb, 1, 1:3, widths="auto")
+  print(IDA_obj$Quality+labs(title="Quality Overview"))
+  insertPlot(wb, 1, fileType="tiff", startCol=8, startRow=1)
+  addWorksheet(wb, "Processing Values")
+  writeDataTable(wb, 2, IDA_obj$Info)
+  setColWidths(wb, 2, 1:3, widths="auto")
+  for (i in 1:length(IDA_obj$Processed)){
+    
+    addWorksheet(wb, as.character(IDA_obj$Eval$Sample[i]))
+    raw <- as.data.frame(IDA_obj$Raw[[i]])[, -1]
+    names(raw) <- gsub("X", "", names(raw))
+    proc <- as.data.frame(IDA_obj$Processed[[i]])
+    names(proc) <- gsub("X", "", names(proc))
+    names(proc)[2:3] <- paste(names(proc)[2:3], " corrected")
+    temp <- data.frame(cbind(proc$Time,
+                             proc$Ratio,
+                             proc[, 2:3],
+                             raw))
+    nam_list <- c("Time",
+                  "Ratio",
+                  gsub("X", "", names(proc)[2:3]),
+                  gsub("X", "", names(raw)))
+    names(temp) <- nam_list
+    procAtts <- data.frame(c("Isotope1 Background", "Isotope2 Background", "Stable Time Start", "Stable Time End",
+                             "Buffer Size", "RSD Tolerance", "Expansion Size"),
+                           as.character(attributes(IDA_obj$Processed[[i]])[1:7]))
+    names(procAtts) <- c("Processing Attribute", "Value")
+    if (draw_stable_bounds) {
+      print(IDA_obj$Graphs[[i]]$Signal+
+              geom_vline(xintercept=IDA_obj$Info[i,6], colour='red')+
+              geom_vline(xintercept=IDA_obj$Info[i,7], colour='red'))
+    } else {
+      print(IDA_obj$Graphs[[i]]$Signal)
+    }
+    insertPlot(wb, i+2, fileType="tiff", startCol=1, startRow=1)
+    if (draw_stable_bounds) {
+      print(IDA_obj$Graphs[[i]]$Ratio+
+              geom_vline(xintercept=IDA_obj$Info[i,6], colour='red')+
+              geom_vline(xintercept=IDA_obj$Info[i,7], colour='red'))
+    } else {
+      print(IDA_obj$Graphs[[i]]$Ratio)
+    }
+    insertPlot(wb, i+2, fileType="tiff", startCol=1, startRow=20)
+    writeDataTable(wb, i+2, procAtts, startCol=10, startRow=1)
+    writeDataTable(wb, i+2, temp, startCol=10, startRow=10)
+    setColWidths(wb, i, 1:11, widths="auto")
+  }
+  return(wb)
 }
