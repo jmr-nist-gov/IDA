@@ -490,7 +490,7 @@ shinyServer(function(session, input, output) {
       } else {
         fname <- paste0(file_selected()$name, " - processed ", Sys.Date(), ".xlsx")
       }
-      saveWorkbook(pack_as_excel(IDA_result), fname, overwrite = TRUE)
+      saveWorkbook(pack_as_excel(IDA_result, draw_stable_bounds=TRUE), fname, overwrite = TRUE)
       file.copy(fname, file)
       file.remove(fname)
       addClass("mask", "hidden")
