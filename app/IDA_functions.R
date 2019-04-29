@@ -138,8 +138,8 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
     ggplot(aes(x = Time/1000))+
     geom_hline(yintercept=attr(dat_rat, "iso1.background"), colour='black')+
     geom_hline(yintercept=attr(dat_rat, "iso2.background"), colour='blue')+
-    geom_line(aes(y=.[[2]]), colour='black')+
-    geom_line(aes(y=.[[3]]), colour='blue')+
+    geom_line(aes(y=dat_raw[[2]]), colour='black')+
+    geom_line(aes(y=dat_raw[[3]]), colour='blue')+
     labs(x = "Time (s)",
          y = "Signal Intensity",
          title = sample_run,
