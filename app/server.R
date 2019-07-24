@@ -315,7 +315,9 @@ shinyServer(function(session, input, output) {
       i <- which(IDA_result$Eval$Sample %in% input$sample)
       IDA_result$Eval[i, 4:6] <<- IDA_summary(IDA_result$Processed[[i]], x_min, x_max)
       attr(IDA_result$Processed[[i]], "stable.start") <<- x_min
+      IDA_result$Info$`Stable Time Start`[i] <<- x_min
       attr(IDA_result$Processed[[i]], "stable.end") <<- x_max
+      IDA_result$Info$`Stable Time End`[i] <<- x_max
       IDA_result$Quality <<- IDA_quality(IDA_result$Eval)
       redrawit <- redraw() + 1
       redraw(redrawit)
