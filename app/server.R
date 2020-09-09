@@ -1,4 +1,5 @@
-# Load dependencies
+# These first two should really be moved to global.R
+# Load dependencies ----
 packs <- c("shiny", "tidyverse", "DT", "shinyjs", "openxlsx")
 packs_false <- packs[-which(packs %in% installed.packages())]
 if (length(packs_false) > 0) {
@@ -7,12 +8,13 @@ if (length(packs_false) > 0) {
 lapply(packs, library, character.only = TRUE)
 rm(packs, packs_false)
 
-# Version of Isotope Dilution Assistant to use
+# Version of Isotope Dilution Assistant to use ----
 source('IDA_functions.R')
 
+# Server function ----
 shinyServer(function(session, input, output) {
   
-  # Inputs
+  # Inputs ----
   file_selected     <- reactive(input$fn)
   apply_to          <- reactive(input$apply)
   buffer_all        <- reactive(input$buffer_all)
@@ -36,7 +38,8 @@ shinyServer(function(session, input, output) {
   disable("saveCSVProcVals")
   disable("saveMSXL")
   
-  # Main function - generates IDA object on file load
+  # Main function ----
+  # Generates IDA object on file load
   observeEvent({
     input$fn
     input$buffer_all
@@ -83,7 +86,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
-  # Single sample parameter update
+  # Single sample parameter update ----
   observeEvent({
     input$buffer_single
     input$tolerance_single
@@ -91,7 +94,7 @@ shinyServer(function(session, input, output) {
   }, {
     if (slide_trigger & !is.null(IDA_result)) {
       x <- which(IDA_result$Eval$Sample == input$sample)
-      # Replace processed, including attributes
+      # Replace processed, including
       IDA_temp <- IDA_calc(
         IDA_result[[4]][[x]],
         input$buffer_single,
@@ -128,6 +131,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # Update outputs ----
   # Observe changes to redraw() and recreate outputs.  This can now be fired from anywhere by changing redraw().
   observeEvent(redraw(), {
     if (!is.null(IDA_result)) {
@@ -207,6 +211,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # File required ----
   # Make certain user doesn't select "Single Sample" prior to a file being loaded.
   observeEvent(input$apply, {
     if (input$apply == "Single Sample" & is.null(IDA_result)) {
@@ -215,6 +220,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # Sample selection ----
   # Observe sample selection change to highlight the given sample in the quality plot
   observeEvent(input$sample, {
     if (!is.null(IDA_result)) {
@@ -272,6 +278,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # Qual plot click ----
   # Observe quality plot click event and change selected sample to nearest point.
   observe({
     if (!is.null(input$click_quality)) {
@@ -282,6 +289,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # Ratio plot brush ----
   # Observe ratio plot brushing event and provide the user real-time feedback on performance.
   observe({
     if (!is.null(input$brush_ratio)) {
@@ -305,7 +313,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
-  # Save the new stability time region
+  # Save the new stability time region ----
   observeEvent(input$saveNewTime, {
     if (is.null(input$brush_ratio)) {
       info("Please select a region of the ratio plot.")
@@ -325,7 +333,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
-  # Load an archived analysis
+  # Load an archived analysis ----
   observeEvent(input$pastSamples, {
     if (change_archive_list) {
       if (!is.null(input$pastSamples)) {
@@ -369,6 +377,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # Load from archive ----
   # Load an archived analysis from the modal dialog (same code snippet as above but triggers from modal dialogue)
   observeEvent(input$loadArchive, {
     load(paste0(getwd(), "/archive/", input$pastSamples[1], ".Rdata"))
@@ -394,7 +403,7 @@ shinyServer(function(session, input, output) {
     redraw(redrawit)
   })
   
-  # Archive the current analysis
+  # Archive the current analysis ----
   observeEvent(input$archive, {
     if (is.null(IDA_result)) {
       alert("Please load a file for analysis.")
@@ -425,6 +434,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
+  # Download Example ----
   # Provide an example file from the app directory to provider users with the expected input format and to have a file to explore the tool.
   output$example <- downloadHandler(
     filename = "IDA Example - SRM 2778.csv",
@@ -444,7 +454,7 @@ shinyServer(function(session, input, output) {
     }
   )
   
-  # Download handlers
+  ## Download summary ----
   output$saveCSVSummary <- downloadHandler(
     filename = function() {
       paste0(
@@ -463,6 +473,8 @@ shinyServer(function(session, input, output) {
       )
     }
   )
+  
+  # Download processing values ----
   output$saveCSVProcVals <- downloadHandler(
     filename = function() {
       paste0(
@@ -481,6 +493,8 @@ shinyServer(function(session, input, output) {
       )
     }
   )
+  
+  # Download as XL ----
   output$saveMSXL <- downloadHandler(
     filename = function() {
       if (is.null(file_selected())){
