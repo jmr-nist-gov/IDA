@@ -192,6 +192,9 @@ IDA_quality <- function(dat) {
   } else {
     samples_over <- paste(samples_over, "samples")
   }
+  if (is.character(dat$Sample)) {
+    dat$Sample <- as.factor(dat$Sample)
+  }
   dat$Sample <- factor(dat$Sample, levels=rev(levels(dat$Sample)))
   out <-  ggplot(dat, aes(y=Sample, x=RSD))+
     geom_point(colour='white', alpha=0)
