@@ -419,7 +419,7 @@ shinyServer(function(session, input, output) {
       save(out, file = destination)
       alert(paste0("The current analysis has been archived as ", fname, "."))
       change_archive_list(!change_archive_list())
-      pastAnalyses <- gsub(".Rdata", "", list.files(file.path(getwd(), "archive")))
+      pastAnalyses <- gsub(".Rdata", "", list.files(file.path(getwd(), "archive"), pattern = ".Rdata"))
       selected_archive <- isolate(input$pastSamples)
       updateSelectizeInput(session,
                            'pastSamples',
