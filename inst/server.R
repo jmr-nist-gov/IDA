@@ -18,9 +18,17 @@ shinyServer(function(session, input, output) {
     }
   })
   redraw <- reactiveVal(1)
-  IDA_result <- NULL
-  slide_trigger <- TRUE
-  change_archive_list <- TRUE
+  IDA_result <- reactiveValues(
+    Eval      = NULL,
+    Info      = NULL,
+    Processed = NULL,
+    Raw       = NULL,
+    Graphs    = NULL,
+    Quality   = NULL,
+    isotopes  = NULL
+  )
+  slide_trigger <- reactiveVal(TRUE)
+  change_archive_list <- reactiveVal(TRUE)
   disable("saveCSVSummary")
   disable("saveCSVProcVals")
   disable("saveMSXL")
@@ -34,7 +42,7 @@ shinyServer(function(session, input, output) {
     input$expansion_all
   }, {
     if (!is.null(input$fn)) {
-      IDA_result <<- isolate({
+      tmp <- isolate({
         IDA(
           input$fn$datapath,
           input$buffer_all,
@@ -43,6 +51,10 @@ shinyServer(function(session, input, output) {
           draw_stable_bounds = FALSE
         )
       })
+      lapply(names(tmp),
+             function(x) {
+               IDA_result[[x]] <- tmp[[x]]
+             })
       sample_list <- as.vector(IDA_result$Eval$Sample)
       updateSelectInput(session,
                         "sample",
@@ -54,7 +66,7 @@ shinyServer(function(session, input, output) {
       updateTabsetPanel(session,
                         'results',
                         selected = "Details")
-      slide_trigger <<- !slide_trigger
+      slide_trigger(!slide_trigger())
       updateSliderInput(session,
                         'buffer_single',
                         value = input$buffer_all)
@@ -64,9 +76,8 @@ shinyServer(function(session, input, output) {
       updateSliderInput(session,
                         'expansion_single',
                         value = input$expansion_all)
-      slide_trigger <<- !slide_trigger
-      redrawit <- redraw() + 1
-      redraw(redrawit)
+      slide_trigger(!slide_trigger())
+      redraw(redraw() + 1)
       enable("saveCSVSummary")
       enable("saveCSVProcVals")
       enable("saveMSXL")
@@ -79,38 +90,38 @@ shinyServer(function(session, input, output) {
     input$tolerance_single
     input$expansion_single
   }, {
-    if (slide_trigger & !is.null(IDA_result)) {
+    req(IDA_result$Processed)
+    if (slide_trigger() & !is.null(IDA_result$Processed)) {
       x <- which(IDA_result$Eval$Sample == input$sample)
       # Replace processed, including
       IDA_temp <- IDA_calc(
-        IDA_result[[4]][[x]],
+        IDA_result$Raw[[x]],
         input$buffer_single,
         input$tolerance_single,
         input$expansion_single
       )
       # Replace processed attributes
-      attributes(IDA_result[[3]][[x]]) <<- attributes(IDA_temp)
+      attributes(IDA_result$Processed[[x]]) <- attributes(IDA_temp)
       # Replace info start and end times
-      IDA_result$Info[x, 6] <<- attr(IDA_temp, "stable.start")
-      IDA_result$Info[x, 7] <<- attr(IDA_temp, "stable.end")
-      IDA_result$Info[x, 8] <<- attr(IDA_temp, "proc.buffer")
-      IDA_result$Info[x, 9] <<- attr(IDA_temp, "proc.tolerance")
-      IDA_result$Info[x, 10] <<- attr(IDA_temp, "proc.expansion")
+      IDA_result$Info[x, 6] <- attr(IDA_temp, "stable.start")
+      IDA_result$Info[x, 7] <- attr(IDA_temp, "stable.end")
+      IDA_result$Info[x, 8] <- attr(IDA_temp, "proc.buffer")
+      IDA_result$Info[x, 9] <- attr(IDA_temp, "proc.tolerance")
+      IDA_result$Info[x, 10] <- attr(IDA_temp, "proc.expansion")
       # Replace eval values
-      IDA_result$Eval[x, 4:6] <<- IDA_summary(IDA_temp,
+      IDA_result$Eval[x, 4:6] <- IDA_summary(IDA_temp,
                                               attr(IDA_temp, "stable.start"),
                                               attr(IDA_temp, "stable.end"))
       # Replace graphs
-      IDA_result$Graphs[[x]] <<- IDA_graphs(
-        IDA_result[[4]][[x]],
+      IDA_result$Graphs[[x]] <- IDA_graphs(
+        IDA_result$Processed[[x]],
         IDA_temp,
-        names(IDA_result[[3]])[x],
-        attr(IDA_result, 'isotopes'),
+        names(IDA_result$Processed)[x],
+        IDA_result$isotopes,
         draw_stable_bounds = FALSE
       )
-      IDA_result$Quality <<- IDA_quality(IDA_result$Eval)
-      redrawit <- redraw() + 1
-      redraw(redrawit)
+      IDA_result$Quality <- IDA_quality(IDA_result$Eval)
+      redraw(redraw() + 1)
       temp_sample <- isolate(input$sample)
       updateSelectInput(session,
                         "sample",
@@ -121,7 +132,7 @@ shinyServer(function(session, input, output) {
   # Update outputs ----
   # Observe changes to redraw() and recreate outputs.  This can now be fired from anywhere by changing redraw().
   observeEvent(redraw(), {
-    if (!is.null(IDA_result)) {
+    if (!is.null(IDA_result$Processed)) {
       output$IDAsummary <- DT::renderDataTable({
         if (is.null(IDA_result$Eval)) {
           NULL
@@ -174,8 +185,7 @@ shinyServer(function(session, input, output) {
       } else {
         i <- current_sample()
       }
-      stable_start <-
-        attr(IDA_result$Processed[[i]], "stable.start")
+      stable_start <-attr(IDA_result$Processed[[i]], "stable.start")
       stable_end <- attr(IDA_result$Processed[[i]], "stable.end")
       stability_caption <- paste0(
         "\nSelected stability region is marked by red lines (",
@@ -201,7 +211,7 @@ shinyServer(function(session, input, output) {
   # File required ----
   # Make certain user doesn't select "Single Sample" prior to a file being loaded.
   observeEvent(input$apply, {
-    if (input$apply == "Single Sample" & is.null(IDA_result)) {
+    if (input$apply == "Single Sample" & is.null(IDA_result$Processed)) {
       shinyjs::info("Please load a sample set first.")
       updateTabsetPanel(session, 'apply', selected = "All")
     }
@@ -210,7 +220,7 @@ shinyServer(function(session, input, output) {
   # Sample selection ----
   # Observe sample selection change to highlight the given sample in the quality plot
   observeEvent(input$sample, {
-    if (!is.null(IDA_result)) {
+    if (!is.null(IDA_result$Processed)) {
       i <- which(IDA_result$Eval$Sample == input$sample)
       ii <- dim(IDA_result$Eval)[1] - i + 1
       output$IDAquality <- renderPlot({
@@ -225,8 +235,8 @@ shinyServer(function(session, input, output) {
             colour = 'forestgreen'
           )
       })
-      updateTabsetPanel(session, 'apply', selected = "Single Sample")
-      slide_trigger <<- !slide_trigger
+      # updateTabsetPanel(session, 'apply', selected = "Single Sample")
+      slide_trigger(!slide_trigger())
       updateSliderInput(session,
                         'buffer_single',
                         value = attr(IDA_result$Processed[[current_sample()]], "proc.buffer"))
@@ -240,7 +250,7 @@ shinyServer(function(session, input, output) {
         'expansion_single',
         value = attr(IDA_result$Processed[[current_sample()]], "proc.expansion")
       )
-      slide_trigger <<- !slide_trigger
+      slide_trigger(!slide_trigger())
       stable_start <-
         attr(IDA_result$Processed[[i]], "stable.start")
       stable_end <- attr(IDA_result$Processed[[i]], "stable.end")
@@ -308,12 +318,12 @@ shinyServer(function(session, input, output) {
       x_min <- round(input$brush_ratio$xmin, 3)
       x_max <- round(input$brush_ratio$xmax, 3)
       i <- which(IDA_result$Eval$Sample %in% input$sample)
-      IDA_result$Eval[i, 4:6] <<- IDA_summary(IDA_result$Processed[[i]], x_min, x_max)
-      attr(IDA_result$Processed[[i]], "stable.start") <<- x_min
-      IDA_result$Info$`Stable Time Start`[i] <<- x_min
-      attr(IDA_result$Processed[[i]], "stable.end") <<- x_max
-      IDA_result$Info$`Stable Time End`[i] <<- x_max
-      IDA_result$Quality <<- IDA_quality(IDA_result$Eval)
+      IDA_result$Eval[i, 4:6] <- IDA_summary(IDA_result$Processed[[i]], x_min, x_max)
+      attr(IDA_result$Processed[[i]], "stable.start") <- x_min
+      IDA_result$Info$`Stable Time Start`[i] <- x_min
+      attr(IDA_result$Processed[[i]], "stable.end") <- x_max
+      IDA_result$Info$`Stable Time End`[i] <- x_max
+      IDA_result$Quality <- IDA_quality(IDA_result$Eval)
       redrawit <- redraw() + 1
       redraw(redrawit)
       updateActionButton(session, 'saveNewTime', label = "Draw on the ratio plot to select a new stability region.")
@@ -322,7 +332,7 @@ shinyServer(function(session, input, output) {
   
   # Load an archived analysis ----
   observeEvent(input$pastSamples, {
-    if (change_archive_list) {
+    if (change_archive_list()) {
       if (!is.null(input$pastSamples)) {
         if (!is.null(IDA_result)) {
           showModal(
@@ -334,8 +344,8 @@ shinyServer(function(session, input, output) {
             )
           )
         } else {
-          load(paste0(getwd(), "/archive/", input$pastSamples[1], ".Rdata"))
-          IDA_result <<- IDA_result
+          load(file.path(getwd(), "archive", input$pastSamples[1], ".Rdata"))
+          IDA_result <- IDA_result
           sample_list <- as.vector(IDA_result$Eval$Sample)
           updateSelectInput(
             session,
@@ -368,7 +378,7 @@ shinyServer(function(session, input, output) {
   # Load an archived analysis from the modal dialog (same code snippet as above but triggers from modal dialogue)
   observeEvent(input$loadArchive, {
     load(paste0(getwd(), "/archive/", input$pastSamples[1], ".Rdata"))
-    IDA_result <<- IDA_result
+    IDA_result <- IDA_result
     sample_list <- as.vector(IDA_result$Eval$Sample)
     updateSelectInput(session,
                       "sample",
@@ -400,16 +410,16 @@ shinyServer(function(session, input, output) {
                " - ",
                gsub(".csv", "", file_selected()$name),
                ".Rdata")
-      destination <- paste0(getwd(), "/archive/", fname)
+      destination <- file.path(getwd(), "archive", fname)
       updateActionButton(session,
                          'archive',
                          label = "Archived, click to update",
                          icon = icon("toggle-on"))
-      save(IDA_result, file = destination)
+      out <- reactiveValuesToList(IDA_result)
+      save(out, file = destination)
       alert(paste0("The current analysis has been archived as ", fname, "."))
-      change_archive_list <<- !change_archive_list
-      pastAnalyses <-
-        gsub(".Rdata", "", list.files(paste0(getwd(), "/archive/")))
+      change_archive_list(!change_archive_list())
+      pastAnalyses <- gsub(".Rdata", "", list.files(file.path(getwd(), "archive")))
       selected_archive <- isolate(input$pastSamples)
       updateSelectizeInput(session,
                            'pastSamples',
@@ -417,7 +427,7 @@ shinyServer(function(session, input, output) {
                            selected = selected_archive, 
                            options = list(placeholder = "(Select a prior analysis)",
                                           maxItems = 1))
-      change_archive_list <<- !change_archive_list
+      change_archive_list(!change_archive_list())
     }
   })
   

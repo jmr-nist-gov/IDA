@@ -296,10 +296,8 @@ IDA <- function(file_name, buffer = 10, tolerance = 0.1, expansion = 10, draw_st
               Processed = full,
               Raw = dat,
               Graphs = graphs,
-              Quality = IDA_quality(out))
-  
-  mostattributes(out) <- c(attributes(out),
-                           "isotopes" = isotopes)
+              Quality = IDA_quality(out),
+              isotopes = isotopes)
   return(out)
 }
 
