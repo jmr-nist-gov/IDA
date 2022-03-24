@@ -151,7 +151,7 @@ shinyUI(
                                                                        #textOutput("brushText"),
                                                                        actionButton("saveNewTime", 
                                                                                     "Draw on the ratio plot to select a new stability region.",
-                                                                                    icon=icon("pencil-square"))),
+                                                                                    icon=icon("pen-square"))),
                                                               tabPanel("Values",
                                                                        br(),
                                                                        DT::dataTableOutput("IDAvalues"))

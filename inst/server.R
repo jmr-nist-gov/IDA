@@ -306,7 +306,7 @@ shinyServer(function(session, input, output) {
       )
       btn_text <-
         paste0("Save ", x_min, "-", x_max, " s as the stability region.")
-      updateActionButton(session, 'saveNewTime', label = btn_text, icon=icon("floppy-o"))
+      updateActionButton(session, 'saveNewTime', label = btn_text, icon=icon("save"))
     }
   })
   
