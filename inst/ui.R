@@ -6,7 +6,12 @@ if (length(packs_false) > 0) {
 lapply(packs, library, character.only=TRUE)
 
 instructions <- "instructions.html"
-pastAnalyses <- gsub(".Rdata", "", list.files(paste0(getwd(), "/archive/")))
+pastAnalyses <- gsub(".RDS", "",
+                     list.files(
+                       path = file.path(getwd(), "archive"),
+                       pattern = ".RDS$"
+                     )
+)
 if (length(pastAnalyses) == 0) pastAnalyses <- NULL
 if (is.null(pastAnalyses)){
   pastSamples_placeholder <- "(No archived analyses yet.)"

@@ -344,9 +344,9 @@ shinyServer(function(session, input, output) {
             )
           )
         } else {
-          load(file.path(getwd(), "archive", input$pastSamples[1], ".Rdata"))
-          IDA_result <- IDA_result
-          sample_list <- as.vector(IDA_result$Eval$Sample)
+          archive <- file.path(getwd(), "archive", input$pastSamples[1], ".RDS")
+          IDA_result(archive)
+          sample_list <- as.vector(archive$Eval$Sample)
           updateSelectInput(
             session,
             "sample",
@@ -377,9 +377,9 @@ shinyServer(function(session, input, output) {
   # Load from archive ----
   # Load an archived analysis from the modal dialog (same code snippet as above but triggers from modal dialogue)
   observeEvent(input$loadArchive, {
-    load(paste0(getwd(), "/archive/", input$pastSamples[1], ".Rdata"))
-    IDA_result <- IDA_result
-    sample_list <- as.vector(IDA_result$Eval$Sample)
+    archive <- readRDS(file.path(getwd(), "archive", paste0(input$pastSamples[1], ".RDS")))
+    IDA_result(archive)
+    sample_list <- as.vector(archive$Eval$Sample)
     updateSelectInput(session,
                       "sample",
                       choices = sample_list,
@@ -409,17 +409,17 @@ shinyServer(function(session, input, output) {
         paste0(Sys.Date(),
                " - ",
                gsub(".csv", "", file_selected()$name),
-               ".Rdata")
+               ".RDS")
       destination <- file.path(getwd(), "archive", fname)
       updateActionButton(session,
                          'archive',
                          label = "Archived, click to update",
                          icon = icon("toggle-on"))
       out <- reactiveValuesToList(IDA_result)
-      save(out, file = destination)
+      saveRDS(out, file = destination)
       alert(paste0("The current analysis has been archived as ", fname, "."))
       change_archive_list(!change_archive_list())
-      pastAnalyses <- gsub(".Rdata", "", list.files(file.path(getwd(), "archive"), pattern = ".Rdata"))
+      pastAnalyses <- gsub(".RDS", "", list.files(file.path(getwd(), "archive"), pattern = ".RDS"))
       selected_archive <- isolate(input$pastSamples)
       updateSelectizeInput(session,
                            'pastSamples',
