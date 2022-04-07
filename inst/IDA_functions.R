@@ -181,12 +181,16 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
   return(list(Signal = signal, Ratio = ratios))
 }
 
-IDA_quality <- function(dat) {
+IDA_quality <- function(dat, expand_vertical_axis = TRUE) {
+  samples <- 1:nrow(dat)
   blanks <- c(grep("Blank", dat$Sample), grep("blank", dat$Sample))
-  xbar <- mean(dat$RSD[-blanks])
-  sd1 <- sd(dat$RSD[-blanks])
+  if (length(blanks) > 0) {
+    samples <- samples[-blanks]
+  }
+  xbar <- mean(dat$RSD[samples])
+  sd1 <- sd(dat$RSD[samples])
   n <- length(dat$Sample)
-  samples_over <- dat[-blanks,] %>% filter(RSD > 5) %>% pull(Sample) %>% length()
+  samples_over <- dat[samples,] %>% filter(RSD > 5) %>% pull(Sample) %>% length()
   if (samples_over == 1) {
     samples_over <- paste(samples_over, "sample")
   } else {
@@ -207,24 +211,24 @@ IDA_quality <- function(dat) {
       geom_vline(xintercept=5, colour='red')
   }
   out <- out +
-      geom_point(data=dat[-blanks,],
+      geom_point(data=dat[samples,],
                  aes(y=Sample, x=RSD),
                  colour='black',
                  pch=16)+
-      geom_point(data=dat[blanks,],
+      geom_point(data=dat[-samples,],
                  aes(y=Sample, x=RSD),
                  colour='blue',
                  pch=1)+
-      geom_text(data=dat[blanks,],
+      geom_text(data=dat[-samples,],
                 aes(label=Sample, y=Sample, x=RSD),
                 colour='blue',
                 hjust=1.1,
                 vjust=0.5)+
-      geom_point(data=dat[-blanks,] %>% filter(RSD > 5),
+      geom_point(data=dat[samples,] %>% filter(RSD > 5),
                  aes(y=Sample, x=RSD),
                  colour='red',
                  pch=16)+
-      geom_text(data=dat[-blanks,] %>% filter(RSD > 5),
+      geom_text(data=dat[samples,] %>% filter(RSD > 5),
                 aes(label=Sample, y=Sample, x=RSD),
                 colour='red',
                 hjust=-0.1,
@@ -239,6 +243,12 @@ IDA_quality <- function(dat) {
                            "The red line represents the 5% RSD threshold.",
                            sep="\n"))+
       theme_classic()
+  # Expand the vertical dimension to account for long names (only a problem after including the "expanded" sample name)
+  expansion_coef <- max(nchar(as.character(dat$Sample)))
+  if (expand_vertical_axis) {
+    out <- out +
+      scale_x_continuous(expand = expansion(add = c(0, expansion_coef/100)))
+  }
   return(out)
 }
 
@@ -283,10 +293,11 @@ IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
   names(full) <- names(dat)
   names(graphs) <- names(dat)
   
-  samples <- as.data.frame(strsplit(names(dat), "    "), row.names=NULL, stringsAsFactors=FALSE)
-  names(samples) <- c()
-  samples <- as.data.frame(t(samples))
-  names(samples) <- c("Sample", "DateTime", "Run")
+  # samples <- as.data.frame(strsplit(names(dat), "    "), row.names=NULL, stringsAsFactors=FALSE)
+  # names(samples) <- c()
+  # samples <- as.data.frame(t(samples))
+  # names(samples) <- c("Sample", "DateTime", "Run")
+  samples <- data.frame(Sample = names(dat))
   out <- out[-1,]
   info <- info[-1,]
   names(info) <- c("Isotope1 Baseline", "Isotope2 Baseline", "Stable Time Start", "Stable Time End", "Buffer Size", "Tolerance", "Expansion Size")
