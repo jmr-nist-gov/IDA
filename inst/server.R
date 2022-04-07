@@ -27,8 +27,10 @@ shinyServer(function(session, input, output) {
     Quality   = NULL,
     isotopes  = NULL
   )
-  slide_trigger <- reactiveVal(TRUE)
+  slide_trigger <- TRUE
   change_archive_list <- reactiveVal(TRUE)
+  load_archive <- reactiveVal(0)
+  is_archived <- FALSE
   disable("saveCSVSummary")
   disable("saveCSVProcVals")
   disable("saveMSXL")
@@ -37,54 +39,63 @@ shinyServer(function(session, input, output) {
   observeEvent(input$inspect, { browser() })
   
   # Main function ----
-  # Generates IDA object on file load
+  # Generates IDA object on file or archive load
+  observeEvent(input$fn, {
+    is_archived <- FALSE
+  })
+  
   observeEvent({
     input$fn
     input$buffer_all
     input$tolerance_all
     input$expansion_all
   }, {
-    if (!is.null(input$fn)) {
-      tmp <- isolate({
-        IDA(
-          input$fn$datapath,
-          input$buffer_all,
-          input$tolerance_all,
-          input$expansion_all,
-          draw_stable_bounds = FALSE
-        )
-      })
-      lapply(names(tmp),
-             function(x) {
-               IDA_result[[x]] <- tmp[[x]]
-             })
-      sample_list <- as.vector(IDA_result$Eval$Sample)
-      updateSelectInput(session,
-                        "sample",
-                        choices = sample_list,
-                        selected = head(sample_list, 1))
-      updateTabsetPanel(session,
-                        'main',
-                        selected = "Results")
-      updateTabsetPanel(session,
-                        'results',
-                        selected = "Details")
-      slide_trigger(!slide_trigger())
-      updateSliderInput(session,
-                        'buffer_single',
-                        value = input$buffer_all)
-      updateSliderInput(session,
-                        'tolerance_single',
-                        value = input$tolerance_all)
-      updateSliderInput(session,
-                        'expansion_single',
-                        value = input$expansion_all)
-      slide_trigger(!slide_trigger())
-      redraw(redraw() + 1)
-      enable("saveCSVSummary")
-      enable("saveCSVProcVals")
-      enable("saveMSXL")
+    req(slide_trigger, any(!is.null(input$fn), is_archived))
+    if (is_archived) {
+      raw_data <- IDA_result$Raw
+    } else {
+      raw_data <- input$fn$datapath
     }
+    tmp <- isolate({
+      IDA(
+        raw_data = raw_data,
+        buffer = input$buffer_all,
+        tolerance = input$tolerance_all,
+        expansion = input$expansion_all,
+        draw_stable_bounds = FALSE,
+        is_file = !is_archived
+      )
+    })
+    lapply(names(tmp),
+           function(x) {
+             IDA_result[[x]] <- tmp[[x]]
+           })
+    sample_list <- as.vector(IDA_result$Eval$Sample)
+    updateSelectInput(session,
+                      "sample",
+                      choices = sample_list,
+                      selected = head(sample_list, 1))
+    updateTabsetPanel(session,
+                      'main',
+                      selected = "Results")
+    updateTabsetPanel(session,
+                      'results',
+                      selected = "Details")
+    slide_trigger <- !slide_trigger
+    updateSliderInput(session,
+                      'buffer_single',
+                      value = input$buffer_all)
+    updateSliderInput(session,
+                      'tolerance_single',
+                      value = input$tolerance_all)
+    updateSliderInput(session,
+                      'expansion_single',
+                      value = input$expansion_all)
+    slide_trigger <- !slide_trigger
+    redraw(redraw() + 1)
+    enable("saveCSVSummary")
+    enable("saveCSVProcVals")
+    enable("saveMSXL")
   })
   
   # Single sample parameter update ----
@@ -94,7 +105,7 @@ shinyServer(function(session, input, output) {
     input$expansion_single
   }, {
     req(IDA_result$Processed)
-    if (slide_trigger() & !is.null(IDA_result$Processed)) {
+    if (slide_trigger && !is.null(IDA_result$Processed)) {
       x <- which(IDA_result$Eval$Sample == input$sample)
       # Replace processed, including
       IDA_temp <- IDA_calc(
@@ -113,8 +124,8 @@ shinyServer(function(session, input, output) {
       IDA_result$Info[x, 10] <- attr(IDA_temp, "proc.expansion")
       # Replace eval values
       IDA_result$Eval[x, 4:6] <- IDA_summary(IDA_temp,
-                                              attr(IDA_temp, "stable.start"),
-                                              attr(IDA_temp, "stable.end"))
+                                             attr(IDA_temp, "stable.start"),
+                                             attr(IDA_temp, "stable.end"))
       # Replace graphs
       IDA_result$Graphs[[x]] <- IDA_graphs(
         IDA_result$Processed[[x]],
@@ -183,7 +194,7 @@ shinyServer(function(session, input, output) {
           x
         }
       })
-      if (input$sample == "Please load a file first.") {
+      if (input$sample == "Please load a file first." || length(current_sample()) == 0) {
         i <- 1
       } else {
         i <- current_sample()
@@ -239,7 +250,7 @@ shinyServer(function(session, input, output) {
           )
       })
       # updateTabsetPanel(session, 'apply', selected = "Single Sample")
-      slide_trigger(!slide_trigger())
+      slide_trigger <- !slide_trigger
       updateSliderInput(session,
                         'buffer_single',
                         value = attr(IDA_result$Processed[[current_sample()]], "proc.buffer"))
@@ -253,7 +264,7 @@ shinyServer(function(session, input, output) {
         'expansion_single',
         value = attr(IDA_result$Processed[[current_sample()]], "proc.expansion")
       )
-      slide_trigger(!slide_trigger())
+      slide_trigger <- !slide_trigger
       stable_start <-
         attr(IDA_result$Processed[[i]], "stable.start")
       stable_end <- attr(IDA_result$Processed[[i]], "stable.end")
@@ -333,7 +344,7 @@ shinyServer(function(session, input, output) {
     }
   })
   
-  # Load an archived analysis ----
+  # Archived analysis modal ----
   observeEvent(input$pastSamples, {
     if (change_archive_list()) {
       if (!is.null(input$pastSamples)) {
@@ -347,27 +358,7 @@ shinyServer(function(session, input, output) {
             )
           )
         } else {
-          archive <- file.path(getwd(), "archive", input$pastSamples[1], ".RDS")
-          IDA_result(archive)
-          sample_list <- as.vector(archive$Eval$Sample)
-          updateSelectInput(
-            session,
-            "sample",
-            choices = sample_list,
-            selected = head(sample_list, 1)
-          )
-          updateTabsetPanel(session,
-                            'main',
-                            selected = "Results")
-          updateTabsetPanel(session,
-                            'results',
-                            selected = "Details")
-          updateActionButton(session,
-                             'archive',
-                             label = "Archived, click to update",
-                             icon = icon("toggle-on"))
-          redrawit <- redraw() + 1
-          redraw(redrawit)
+          load_archive(load_archive() + 1)
           reset("fn")
           enable("saveCSVSummary")
           enable("saveCSVProcVals")
@@ -377,12 +368,24 @@ shinyServer(function(session, input, output) {
     }
   })
   
-  # Load from archive ----
-  # Load an archived analysis from the modal dialog (same code snippet as above but triggers from modal dialogue)
+  # Confirm archive load ----
   observeEvent(input$loadArchive, {
+    load_archive(load_archive() + 1)
+  })
+  
+  # Load from archive ----
+  observeEvent(load_archive(), {
+    req(load_archive() > 0)
     archive <- readRDS(file.path(getwd(), "archive", paste0(input$pastSamples[1], ".RDS")))
-    IDA_result(archive)
-    sample_list <- as.vector(archive$Eval$Sample)
+    validate(
+      need(all(names(IDA_result %in% names(archive))),
+           message = "This archive does not contain all necessary information.")
+    )
+    lapply(names(IDA_result),
+           function(x) {
+             IDA_result[[x]] <- archive[[x]]
+           })
+    sample_list <- as.vector(IDA_result$Eval$Sample)
     updateSelectInput(session,
                       "sample",
                       choices = sample_list,
@@ -401,11 +404,12 @@ shinyServer(function(session, input, output) {
     removeModal()
     redrawit <- redraw() + 1
     redraw(redrawit)
+    is_archived <- TRUE
   })
   
   # Archive the current analysis ----
   observeEvent(input$archive, {
-    if (is.null(IDA_result)) {
+    if (is.null(IDA_result$Eval)) {
       alert("Please load a file for analysis.")
     } else {
       fname <-
@@ -434,7 +438,9 @@ shinyServer(function(session, input, output) {
     }
   })
   
-  # Download Example ----
+  # ______________________________----
+  # Downloads ----
+  ## Example file ----
   # Provide an example file from the app directory to provider users with the expected input format and to have a file to explore the tool.
   output$example <- downloadHandler(
     filename = "IDA Example - SRM 2778.csv",
@@ -454,7 +460,7 @@ shinyServer(function(session, input, output) {
     }
   )
   
-  ## Download summary ----
+  ## Current summary ----
   output$saveCSVSummary <- downloadHandler(
     filename = function() {
       paste0(
@@ -474,7 +480,7 @@ shinyServer(function(session, input, output) {
     }
   )
   
-  # Download processing values ----
+  ## All processing values ----
   output$saveCSVProcVals <- downloadHandler(
     filename = function() {
       paste0(
@@ -494,7 +500,7 @@ shinyServer(function(session, input, output) {
     }
   )
   
-  # Download as XL ----
+  ## All as MSXL ----
   output$saveMSXL <- downloadHandler(
     filename = function() {
       if (is.null(file_selected())){

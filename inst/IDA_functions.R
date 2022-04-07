@@ -242,10 +242,14 @@ IDA_quality <- function(dat) {
   return(out)
 }
 
-IDA <- function(file_name, buffer = 10, tolerance = 0.1, expansion = 10, draw_stable_bounds = TRUE) {
+IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_stable_bounds = TRUE, is_file = TRUE) {
   require(tidyverse)
-  dat <- read_csv(file_name)
-  dat <- IDA_parse(dat)
+  if (is_file) {
+    dat <- read_csv(raw_data)
+    dat <- IDA_parse(dat)
+  } else {
+    dat <- IDA_calc(raw_data)
+  }
   
   out <- as.data.frame(matrix(nrow=1, ncol=3))
   names(out) <- c("Mean", "StDev", "RSD")
