@@ -44,6 +44,12 @@ shinyUI(
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
       sidebarPanel(
+        tagList(
+          if(TESTING) {
+          actionButton("inspect", "Inspect App")
+          } else {
+          NULL
+        }),
         h4("1. Apply processing values to:"),
         tabsetPanel(id = "apply", type="pills",
                     tabPanel("All",

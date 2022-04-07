@@ -33,6 +33,9 @@ shinyServer(function(session, input, output) {
   disable("saveCSVProcVals")
   disable("saveMSXL")
   
+  # Testing ----
+  observeEvent(input$inspect, { browser() })
+  
   # Main function ----
   # Generates IDA object on file load
   observeEvent({
