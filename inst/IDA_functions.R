@@ -88,8 +88,8 @@ IDA_summary <- function(dat, stable.start, stable.end) {
   if (!is.data.frame(dat)) dat <- as.data.frame(dat)
   temp <- dat %>% filter(Time >= stable.start & Time <= stable.end)
   out <- data.frame(Mean = mean(temp$Ratio),
-              StDev = sd(temp$Ratio),
-              RSD = sd(temp$Ratio)/mean(temp$Ratio)*100)
+                    StDev = sd(temp$Ratio),
+                    RSD = sd(temp$Ratio)/mean(temp$Ratio)*100)
   return(out)
 }
 
@@ -98,7 +98,7 @@ IDA_calc <- function(dat, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
   m2 <- IDA_background(dat[[2]])
   m3 <- IDA_background(dat[[3]])
   dat2 <- data.frame(
-    dat[[1]]/1000,
+    dat[[1]],
     dat[[2]] - m2,
     dat[[3]] - m3
   )
@@ -116,12 +116,13 @@ IDA_calc <- function(dat, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
   return(dat2)
 }
 
-IDA_graph <- function(dat, ind) {
+IDA_graph <- function(dat, ind, draw_stable_bounds) {
   rat <- dat[[3]][[ind]]
   raw <- dat[[4]][[ind]]
   sam <- names(dat[[3]])[ind]
   iso <- attributes(dat)$isotopes
-  return(IDA_graphs(raw, rat, sam, iso, draw_stable_bounds))
+  out <- IDA_graphs(raw, rat, sam, iso, draw_stable_bounds)
+  return(out)
 }
 
 IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bounds) {
@@ -130,12 +131,12 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
   stable_start <- attr(dat_rat, "stable.start")
   stable_end <- attr(dat_rat, "stable.end")
   isotope_label <- paste(strsplit(isotopes, " ")[[1]],
-                    c("(black) ", "", "(blue)"),
-                    collapse="")
+                         c("(black) ", "", "(blue)"),
+                         collapse="")
   
   # Create signal plot
   signal <- dat_raw %>% as.data.frame %>%
-    ggplot(aes(x = Time/1000))+
+    ggplot(aes(x = Time))+
     geom_hline(yintercept=attr(dat_rat, "iso1.background"), colour='black')+
     geom_hline(yintercept=attr(dat_rat, "iso2.background"), colour='blue')+
     geom_line(aes(y=dat_raw[[2]]), colour='black')+
@@ -145,11 +146,15 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
          title = sample_run,
          subtitle = isotope_label)+
     theme_classic()+
-    scale_y_continuous(labels=scientific_format(digits=2))
+    scale_y_continuous(labels = scientific_format(digits=2))
+  if (packageVersion("scales") >= 1.2) {
+    signal <- signal +
+      scale_x_continuous(labels = label_number(scale = 0.001), n.breaks = 10)
+  }
   if (draw_stable_bounds){
     signal <- signal+
-    geom_vline(xintercept=stable_start, colour='red')+
-    geom_vline(xintercept=stable_end, colour='red')
+      geom_vline(xintercept=stable_start, colour='red')+
+      geom_vline(xintercept=stable_end, colour='red')
   }
   
   # Get functional RSD range limits
@@ -169,6 +174,10 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
     coord_cartesian(ylim=y_range)+
     theme_classic()+
     scale_y_continuous(labels=scientific_format(digits=2))
+  if (packageVersion("scales") >= 1.2) {
+    ratios <- ratios +
+    scale_x_continuous(labels = label_number(scale = 0.001), n.breaks = 10)
+  }
   if (draw_stable_bounds){
     ratios <- ratios+
       geom_vline(xintercept=stable_start, colour='red')+
@@ -181,7 +190,7 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
   return(list(Signal = signal, Ratio = ratios))
 }
 
-IDA_quality <- function(dat, expand_vertical_axis = TRUE) {
+IDA_quality <- function(dat, repel = FALSE) {
   samples <- 1:nrow(dat)
   blanks <- c(grep("Blank", dat$Sample), grep("blank", dat$Sample))
   if (length(blanks) > 0) {
@@ -200,6 +209,10 @@ IDA_quality <- function(dat, expand_vertical_axis = TRUE) {
     dat$Sample <- as.factor(dat$Sample)
   }
   dat$Sample <- factor(dat$Sample, levels=rev(levels(dat$Sample)))
+  dat$label <- dat$Sample %>%
+    str_split("  ") %>%
+    lapply(function(x) x[[1]]) %>%
+    unlist()
   out <-  ggplot(dat, aes(y=Sample, x=RSD))+
     geom_point(colour='white', alpha=0)
   if (n > 1) {
@@ -211,54 +224,65 @@ IDA_quality <- function(dat, expand_vertical_axis = TRUE) {
       geom_vline(xintercept=5, colour='red')
   }
   out <- out +
-      geom_point(data=dat[samples,],
-                 aes(y=Sample, x=RSD),
-                 colour='black',
-                 pch=16)+
-      geom_point(data=dat[-samples,],
-                 aes(y=Sample, x=RSD),
-                 colour='blue',
-                 pch=1)+
+    geom_point(data=dat[samples,] %>% filter(RSD <= 5),
+               aes(y=Sample, x=RSD),
+               colour='black',
+               pch=16) +
+    geom_point(data=dat[-samples,],
+               aes(y=Sample, x=RSD),
+               colour='blue',
+               pch=1) +
+    geom_point(data=dat[samples,] %>% filter(RSD > 5),
+               aes(y=Sample, x=RSD),
+               colour='red',
+               pch=16)
+  if (repel) {
+    out <- out +
+      geom_text_repel(data=dat[-samples,],
+                      aes(label=label, y=Sample, x=RSD),
+                      colour='blue',
+                      hjust=1.1,
+                      vjust=0.5) +
+      geom_text_repel(data=dat[samples,] %>% filter(RSD > 5),
+                      aes(label=label, y=Sample, x=RSD),
+                      colour='red',
+                      hjust=-0.1,
+                      vjust=0.5)
+  } else {
+    out <- out + 
       geom_text(data=dat[-samples,],
-                aes(label=Sample, y=Sample, x=RSD),
+                aes(label=label, y=Sample, x=RSD),
                 colour='blue',
                 hjust=1.1,
-                vjust=0.5)+
-      geom_point(data=dat[samples,] %>% filter(RSD > 5),
-                 aes(y=Sample, x=RSD),
-                 colour='red',
-                 pch=16)+
+                vjust=0.5) +
       geom_text(data=dat[samples,] %>% filter(RSD > 5),
-                aes(label=Sample, y=Sample, x=RSD),
+                aes(label=label, y=Sample, x=RSD),
                 colour='red',
                 hjust=-0.1,
-                vjust=0.5)+
-      labs(x="Relative Standard Deviation (%)",
-           #title = "Quality Overview for this batch",
-           subtitle = paste(samples_over, "over 5% RSD in this set.", sep=" "),
-           caption = paste("",
-                           "Any sample labeled 'blank' is displayed as open blue circles.",
-                           "The green region is -/+1sd of measurements.",
-                           "The blue region is 1sd-2sd of measurements.",
-                           "The red line represents the 5% RSD threshold.",
-                           sep="\n"))+
-      theme_classic()
-  # Expand the vertical dimension to account for long names (only a problem after including the "expanded" sample name)
-  expansion_coef <- max(nchar(as.character(dat$Sample)))
-  if (expand_vertical_axis) {
-    out <- out +
-      scale_x_continuous(expand = expansion(add = c(0, expansion_coef/100)))
+                vjust=0.5)
   }
+  out <- out + 
+    labs(x="Relative Standard Deviation (%)",
+         #title = "Quality Overview for this batch",
+         subtitle = paste(samples_over, "over 5% RSD in this set.", sep=" "),
+         caption = paste("",
+                         "Any sample labeled 'blank' is displayed as open blue circles.",
+                         "The green line repesents the mean RSD of measurements.",
+                         "The green region is -/+1sd of measurements.",
+                         "The blue region is 1sd-2sd of measurements.",
+                         "The red line represents the 5% RSD threshold.",
+                         sep="\n"))+
+    theme_classic()
   return(out)
 }
 
 IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_stable_bounds = TRUE, is_file = TRUE) {
   require(tidyverse)
   if (is_file) {
-    dat <- read_csv(raw_data)
-    dat <- IDA_parse(dat)
+    dat <- read_csv(raw_data) %>%
+      IDA_parse()
   } else {
-    dat <- IDA_calc(raw_data)
+    dat <- raw_data
   }
   
   out <- as.data.frame(matrix(nrow=1, ncol=3))
@@ -275,8 +299,8 @@ IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
                  IDA_summary(temp,
                              attr(temp, "stable.start"),
                              attr(temp, "stable.end")
-                             )
                  )
+    )
     info <- rbind(info,
                   data.frame(Isotope1 = attr(temp, "iso1.background"),
                              Isotope2 = attr(temp, "iso2.background"),
@@ -285,8 +309,8 @@ IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
                              Buffer = attr(temp, "proc.buffer"),
                              Tolerance = attr(temp, "proc.tolerance"),
                              Expansion = attr(temp, "proc.expansion")
-                             )
                   )
+    )
     full[[i]] <- as.list(temp)
     graphs[[i]] <- as.list(IDA_graphs(dat[[i]], temp, names(dat)[i], isotopes, draw_stable_bounds))
   }

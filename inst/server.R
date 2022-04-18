@@ -3,6 +3,7 @@ shinyServer(function(session, input, output) {
   
   # Inputs ----
   file_selected     <- reactive(input$fn)
+  analysis_name     <- reactiveVal(NULL)
   apply_to          <- reactive(input$apply)
   buffer_all        <- reactive(input$buffer_all)
   tolerance_all     <- reactive(input$tolerance_all)
@@ -27,10 +28,11 @@ shinyServer(function(session, input, output) {
     Quality   = NULL,
     isotopes  = NULL
   )
-  slide_trigger <- TRUE
+  slide_trigger <- reactiveVal(TRUE)
   change_archive_list <- reactiveVal(TRUE)
   load_archive <- reactiveVal(0)
-  is_archived <- FALSE
+  is_archived <- reactiveVal(FALSE)
+  is_zoomed <- reactiveVal(FALSE)
   disable("saveCSVSummary")
   disable("saveCSVProcVals")
   disable("saveMSXL")
@@ -41,7 +43,8 @@ shinyServer(function(session, input, output) {
   # Main function ----
   # Generates IDA object on file or archive load
   observeEvent(input$fn, {
-    is_archived <- FALSE
+    is_archived(FALSE)
+    analysis_name(tools::file_path_sans_ext(input$fn$name))
   })
   
   observeEvent({
@@ -50,11 +53,12 @@ shinyServer(function(session, input, output) {
     input$tolerance_all
     input$expansion_all
   }, {
-    req(slide_trigger, any(!is.null(input$fn), is_archived))
-    if (is_archived) {
-      raw_data <- IDA_result$Raw
-    } else {
+    req(slide_trigger(), any(!is.null(input$fn), is_archived()))
+    use_direct <- !is.null(IDA_result$Raw) || is_archived()
+    if (is.null(IDA_result$Raw)) {
       raw_data <- input$fn$datapath
+    } else {
+      raw_data <- IDA_result$Raw
     }
     tmp <- isolate({
       IDA(
@@ -63,9 +67,13 @@ shinyServer(function(session, input, output) {
         tolerance = input$tolerance_all,
         expansion = input$expansion_all,
         draw_stable_bounds = FALSE,
-        is_file = !is_archived
+        is_file = !use_direct
       )
     })
+    tmp$Quality <- list(
+      tmp$Quality,
+      IDA_quality(tmp$Eval, repel = TRUE)
+    )
     lapply(names(tmp),
            function(x) {
              IDA_result[[x]] <- tmp[[x]]
@@ -81,7 +89,7 @@ shinyServer(function(session, input, output) {
     updateTabsetPanel(session,
                       'results',
                       selected = "Details")
-    slide_trigger <- !slide_trigger
+    slide_trigger(!slide_trigger())
     updateSliderInput(session,
                       'buffer_single',
                       value = input$buffer_all)
@@ -91,11 +99,11 @@ shinyServer(function(session, input, output) {
     updateSliderInput(session,
                       'expansion_single',
                       value = input$expansion_all)
-    slide_trigger <- !slide_trigger
-    redraw(redraw() + 1)
+    slide_trigger(!slide_trigger())
     enable("saveCSVSummary")
     enable("saveCSVProcVals")
     enable("saveMSXL")
+    redraw(redraw() + 1)
   })
   
   # Single sample parameter update ----
@@ -104,43 +112,44 @@ shinyServer(function(session, input, output) {
     input$tolerance_single
     input$expansion_single
   }, {
-    req(IDA_result$Processed)
-    if (slide_trigger && !is.null(IDA_result$Processed)) {
-      x <- which(IDA_result$Eval$Sample == input$sample)
-      # Replace processed, including
-      IDA_temp <- IDA_calc(
-        IDA_result$Raw[[x]],
-        input$buffer_single,
-        input$tolerance_single,
-        input$expansion_single
-      )
-      # Replace processed attributes
-      attributes(IDA_result$Processed[[x]]) <- attributes(IDA_temp)
-      # Replace info start and end times
-      IDA_result$Info[x, 6] <- attr(IDA_temp, "stable.start")
-      IDA_result$Info[x, 7] <- attr(IDA_temp, "stable.end")
-      IDA_result$Info[x, 8] <- attr(IDA_temp, "proc.buffer")
-      IDA_result$Info[x, 9] <- attr(IDA_temp, "proc.tolerance")
-      IDA_result$Info[x, 10] <- attr(IDA_temp, "proc.expansion")
-      # Replace eval values
-      IDA_result$Eval[x, 4:6] <- IDA_summary(IDA_temp,
-                                             attr(IDA_temp, "stable.start"),
-                                             attr(IDA_temp, "stable.end"))
-      # Replace graphs
-      IDA_result$Graphs[[x]] <- IDA_graphs(
-        IDA_result$Processed[[x]],
-        IDA_temp,
-        names(IDA_result$Processed)[x],
-        IDA_result$isotopes,
-        draw_stable_bounds = FALSE
-      )
-      IDA_result$Quality <- IDA_quality(IDA_result$Eval)
-      redraw(redraw() + 1)
-      temp_sample <- isolate(input$sample)
-      updateSelectInput(session,
-                        "sample",
-                        selected = temp_sample)
-    }
+    req(IDA_result$Processed, slide_trigger())
+    x <- which(IDA_result$Eval$Sample == input$sample)
+    # Replace processed, including
+    IDA_temp <- IDA_calc(
+      IDA_result$Raw[[x]],
+      input$buffer_single,
+      input$tolerance_single,
+      input$expansion_single
+    )
+    # Replace processed attributes
+    attributes(IDA_result$Processed[[x]]) <- attributes(IDA_temp)
+    # Replace info start and end times
+    IDA_result$Info[x, 6] <- attr(IDA_temp, "stable.start")
+    IDA_result$Info[x, 7] <- attr(IDA_temp, "stable.end")
+    IDA_result$Info[x, 8] <- attr(IDA_temp, "proc.buffer")
+    IDA_result$Info[x, 9] <- attr(IDA_temp, "proc.tolerance")
+    IDA_result$Info[x, 10] <- attr(IDA_temp, "proc.expansion")
+    # Replace eval values
+    IDA_result$Eval[x, 2:4] <- IDA_summary(IDA_temp,
+                                           attr(IDA_temp, "stable.start"),
+                                           attr(IDA_temp, "stable.end"))
+    # Replace graphs
+    IDA_result$Graphs[[x]] <- IDA_graphs(
+      IDA_result$Processed[[x]],
+      IDA_temp,
+      names(IDA_result$Processed)[x],
+      IDA_result$isotopes,
+      draw_stable_bounds = FALSE
+    )
+    IDA_result$Quality <- list(
+      IDA_quality(IDA_result$Eval),
+      IDA_quality(IDA_result$Eval, repel = TRUE)
+    )
+    redraw(redraw() + 1)
+    temp_sample <- isolate(input$sample)
+    updateSelectInput(session,
+                      "sample",
+                      selected = temp_sample)
   })
   
   # Update outputs ----
@@ -160,19 +169,27 @@ shinyServer(function(session, input, output) {
         i <- 1
       }
       ii <- dim(IDA_result$Eval)[1] - i + 1
-      output$IDAquality <- renderPlot({
-        IDA_result$Quality +
-          annotate(
-            "point",
-            x = IDA_result$Eval$RSD[i],
-            y = ii,
-            size = 4,
-            pch = 5,
-            stroke = 2,
-            colour = 'forestgreen'
-          )
-        
-      })
+      out <- IDA_result$Quality[[1 + isolate(input$repel_labels)]] +
+        annotate(
+          "point",
+          x = IDA_result$Eval$RSD[i],
+          y = ii,
+          size = 4,
+          pch = 5,
+          stroke = 2,
+          colour = 'forestgreen'
+        )
+      if (is_zoomed()) {
+        xlims <- isolate(
+          c(input$brush_quality$xmin, input$brush_quality$xmax)
+        )
+        ylims <- isolate(
+          c(input$brush_quality$ymin, input$brush_quality$ymax)
+        )
+        out <- out +
+          coord_cartesian(xlim = xlims, ylim = ylims)
+      }
+      output$IDAquality <- renderPlot(out)
       output$IDAvalues <- DT::renderDataTable({
         if (is.null(IDA_result$Eval)) {
           NULL
@@ -199,7 +216,7 @@ shinyServer(function(session, input, output) {
       } else {
         i <- current_sample()
       }
-      stable_start <-attr(IDA_result$Processed[[i]], "stable.start")
+      stable_start <- attr(IDA_result$Processed[[i]], "stable.start")
       stable_end <- attr(IDA_result$Processed[[i]], "stable.end")
       stability_caption <- paste0(
         "\nSelected stability region is marked by red lines (",
@@ -220,6 +237,9 @@ shinyServer(function(session, input, output) {
           labs(caption = stability_caption)
       })
     }
+  })
+  observeEvent(input$repel_labels, {
+    redraw(redraw() + 1)
   })
   
   # File required ----
@@ -235,22 +255,7 @@ shinyServer(function(session, input, output) {
   # Observe sample selection change to highlight the given sample in the quality plot
   observeEvent(input$sample, {
     if (!is.null(IDA_result$Processed)) {
-      i <- which(IDA_result$Eval$Sample == input$sample)
-      ii <- dim(IDA_result$Eval)[1] - i + 1
-      output$IDAquality <- renderPlot({
-        IDA_result$Quality +
-          annotate(
-            "point",
-            x = IDA_result$Eval$RSD[i],
-            y = ii,
-            size = 4,
-            pch = 5,
-            stroke = 2,
-            colour = 'forestgreen'
-          )
-      })
-      # updateTabsetPanel(session, 'apply', selected = "Single Sample")
-      slide_trigger <- !slide_trigger
+      slide_trigger(!slide_trigger())
       updateSliderInput(session,
                         'buffer_single',
                         value = attr(IDA_result$Processed[[current_sample()]], "proc.buffer"))
@@ -264,40 +269,73 @@ shinyServer(function(session, input, output) {
         'expansion_single',
         value = attr(IDA_result$Processed[[current_sample()]], "proc.expansion")
       )
-      slide_trigger <- !slide_trigger
-      stable_start <-
-        attr(IDA_result$Processed[[i]], "stable.start")
-      stable_end <- attr(IDA_result$Processed[[i]], "stable.end")
-      stability_caption <- paste0(
-        "\nSelected stability region is marked by red lines (",
-        stable_start,
-        "-",
-        stable_end,
-        " s)."
-      )
-      output$rawPlot <- renderPlot({
-        IDA_result$Graphs[[i]]$Signal +
-          geom_vline(xintercept = stable_start, colour = 'red') +
-          geom_vline(xintercept = stable_end, colour = 'red')
-      })
-      output$ratioPlot <- renderPlot({
-        IDA_result$Graphs[[i]]$Ratio +
-          geom_vline(xintercept = stable_start, colour = 'red') +
-          geom_vline(xintercept = stable_end, colour = 'red') +
-          labs(caption = stability_caption)
-      })
+      slide_trigger(!slide_trigger())
+      redraw(redraw() + 1)
     }
   })
   
   # Qual plot click ----
   # Observe quality plot click event and change selected sample to nearest point.
-  observe({
-    if (!is.null(input$click_quality)) {
-      i <- round(input$click_quality$y)
-      i <- dim(IDA_result$Eval)[1] - i + 1
-      selected_sample <- as.character(IDA_result$Eval$Sample[i])
-      updateSelectInput(session, 'sample', selected = selected_sample)
+  observeEvent(input$click_quality, {
+    req(input$click_quality)
+    selected_sample <- nearPoints(
+      df = IDA_result$Quality[[1 + isolate(input$repel_labels)]]$data,
+      coordinfo = input$click_quality,
+      maxpoints = 1,
+      threshold = 10
+    )
+    if (nrow(selected_sample) == 1) {
+      updateSelectInput(session, 'sample', selected = selected_sample$Sample)
     }
+  })
+  
+  # Qual plot brush ----
+  # Observe the quality plot zoom button events and zoom to the brushed area
+  observeEvent(input$zoom_out, {
+    is_zoomed(FALSE)
+    i <- which(IDA_result$Eval$Sample == input$sample)
+    ii <- dim(IDA_result$Eval)[1] - i + 1
+    output$IDAquality <- renderPlot({
+      IDA_result$Quality[[1 + isolate(input$repel_labels)]]+
+        annotate(
+          "point",
+          x = IDA_result$Eval$RSD[i],
+          y = ii,
+          size = 4,
+          pch = 5,
+          stroke = 2,
+          colour = 'forestgreen'
+        )
+    }) 
+  })
+  observeEvent(input$zoom_in, {
+    is_zoomed(TRUE)
+    if (is.null(input$brush_quality)) {
+      alert("Select a region in the quality plot to zoom in and click this button again.")
+    }
+    req(input$brush_quality)
+    i <- which(IDA_result$Eval$Sample == input$sample)
+    ii <- dim(IDA_result$Eval)[1] - i + 1
+    xlims <- isolate(
+      c(input$brush_quality$xmin, input$brush_quality$xmax)
+    )
+    ylims <- isolate(
+      c(input$brush_quality$ymin, input$brush_quality$ymax)
+    )
+    output$IDAquality <- renderPlot({
+      IDA_result$Quality[[1 + isolate(input$repel_labels)]] +
+        coord_cartesian(xlim = xlims,
+                        ylim = ylims) +
+        annotate(
+          "point",
+          x = IDA_result$Eval$RSD[i],
+          y = ii,
+          size = 4,
+          pch = 5,
+          stroke = 2,
+          colour = 'forestgreen'
+        )
+    })
   })
   
   # Ratio plot brush ----
@@ -332,12 +370,15 @@ shinyServer(function(session, input, output) {
       x_min <- round(input$brush_ratio$xmin, 3)
       x_max <- round(input$brush_ratio$xmax, 3)
       i <- which(IDA_result$Eval$Sample %in% input$sample)
-      IDA_result$Eval[i, 4:6] <- IDA_summary(IDA_result$Processed[[i]], x_min, x_max)
+      IDA_result$Eval[i, 2:4] <- IDA_summary(IDA_result$Processed[[i]], x_min, x_max)
       attr(IDA_result$Processed[[i]], "stable.start") <- x_min
       IDA_result$Info$`Stable Time Start`[i] <- x_min
       attr(IDA_result$Processed[[i]], "stable.end") <- x_max
       IDA_result$Info$`Stable Time End`[i] <- x_max
-      IDA_result$Quality <- IDA_quality(IDA_result$Eval)
+      IDA_result$Quality <- list(
+        IDA_quality(IDA_result$Eval),
+        IDA_quality(IDA_result$Eval, repel = TRUE)
+      )
       redrawit <- redraw() + 1
       redraw(redrawit)
       updateActionButton(session, 'saveNewTime', label = "Draw on the ratio plot to select a new stability region.")
@@ -348,12 +389,12 @@ shinyServer(function(session, input, output) {
   observeEvent(input$pastSamples, {
     if (change_archive_list()) {
       if (!is.null(input$pastSamples)) {
-        if (!is.null(IDA_result)) {
+        if (!is.null(IDA_result$Raw)) {
           showModal(
             modalDialog(
               title = "This will remove the current analysis and load one from the archive.",
               actionButton('loadArchive', "Proceed", icon = icon("check")),
-              footer = modalButton("Cancel", icon = icon("close")),
+              footer = modalButton("Cancel", icon = icon("times")),
               fade = FALSE
             )
           )
@@ -376,11 +417,19 @@ shinyServer(function(session, input, output) {
   # Load from archive ----
   observeEvent(load_archive(), {
     req(load_archive() > 0)
-    archive <- readRDS(file.path(getwd(), "archive", paste0(input$pastSamples[1], ".RDS")))
+    fname <- paste0(input$pastSamples[1], ".RDS")
+    analysis_name(tools::file_path_sans_ext(fname))
+    archive <- readRDS(file.path(getwd(), "archive", fname))
     validate(
       need(all(names(IDA_result %in% names(archive))),
            message = "This archive does not contain all necessary information.")
     )
+    if (length(archive$Quality) > 2) {
+      archive$Quality <- list(
+        archive$Quality,
+        IDA_quality(archive$Eval, repel = TRUE)
+      )
+    }
     lapply(names(IDA_result),
            function(x) {
              IDA_result[[x]] <- archive[[x]]
@@ -404,7 +453,7 @@ shinyServer(function(session, input, output) {
     removeModal()
     redrawit <- redraw() + 1
     redraw(redrawit)
-    is_archived <- TRUE
+    is_archived(TRUE)
   })
   
   # Archive the current analysis ----
@@ -412,28 +461,37 @@ shinyServer(function(session, input, output) {
     if (is.null(IDA_result$Eval)) {
       alert("Please load a file for analysis.")
     } else {
-      fname <-
-        paste0(Sys.Date(),
-               " - ",
-               gsub(".csv", "", file_selected()$name),
-               ".RDS")
-      destination <- file.path(getwd(), "archive", fname)
+      req(analysis_name())
+      if (is_archived()) {
+        fname <- analysis_name()
+      } else {
+        fname <- paste0(Sys.Date(), " - ", analysis_name())
+      }
+      destination <- file.path(getwd(), "archive",
+                               paste0(fname,
+                                      ".RDS"))
       updateActionButton(session,
                          'archive',
                          label = "Archived, click to update",
                          icon = icon("toggle-on"))
       out <- reactiveValuesToList(IDA_result)
       saveRDS(out, file = destination)
-      alert(paste0("The current analysis has been archived as ", fname, "."))
+      if (is_archived()) {
+        alert(paste0("This analysis has been updated as ", fname, "."))
+      } else {
+        alert(paste0("The current analysis has been archived as ", fname, "."))
+      }
       change_archive_list(!change_archive_list())
       pastAnalyses <- gsub(".RDS", "", list.files(file.path(getwd(), "archive"), pattern = ".RDS"))
       selected_archive <- isolate(input$pastSamples)
-      updateSelectizeInput(session,
-                           'pastSamples',
-                           choices = pastAnalyses,
-                           selected = selected_archive, 
-                           options = list(placeholder = "(Select a prior analysis)",
-                                          maxItems = 1))
+      if (!is_archived()) {
+        updateSelectizeInput(session,
+                             'pastSamples',
+                             choices = pastAnalyses,
+                             selected = selected_archive, 
+                             options = list(placeholder = "(Select a prior analysis)",
+                                            maxItems = 1))
+      }
       change_archive_list(!change_archive_list())
     }
   })
@@ -463,11 +521,12 @@ shinyServer(function(session, input, output) {
   ## Current summary ----
   output$saveCSVSummary <- downloadHandler(
     filename = function() {
-      paste0(
-        gsub(".csv", "", file_selected()$name),
+      out <- paste0(
+        tools::file_path_sans_ext(analysis_name()),
         " - processed ",
         Sys.Date(),
         " Summary.csv")
+      return(out)
     },
     content = function(file) {
       write.csv(
@@ -484,7 +543,7 @@ shinyServer(function(session, input, output) {
   output$saveCSVProcVals <- downloadHandler(
     filename = function() {
       paste0(
-        gsub(".csv", "", file_selected()$name),
+        analysis_name(),
         " - processed ",
         Sys.Date(),
         " Processing Values.csv")
@@ -503,23 +562,14 @@ shinyServer(function(session, input, output) {
   ## All as MSXL ----
   output$saveMSXL <- downloadHandler(
     filename = function() {
-      if (is.null(file_selected())){
-        paste0(input$pastSamples, " - processed ", Sys.Date(), ".xlsx")
-      } else {
-        paste0(file_selected()$name, " - processed ", Sys.Date(), ".xlsx")
-      }
+      paste0(analysis_name(), " - processed ", Sys.Date(), ".xlsx")
     },
     content = function(file) {
       addClass("mask", "overlay")
       removeClass("mask", "hidden")
-      if (is.null(file_selected())){
-        fname <- paste0(input$pastSamples, " - processed ", Sys.Date(), ".xlsx")
-      } else {
-        fname <- paste0(file_selected()$name, " - processed ", Sys.Date(), ".xlsx")
-      }
-      saveWorkbook(pack_as_excel(IDA_result, draw_stable_bounds=TRUE), fname, overwrite = TRUE)
-      file.copy(fname, file)
-      file.remove(fname)
+      saveWorkbook(pack_as_excel(IDA_result, draw_stable_bounds=TRUE), file, overwrite = TRUE)
+      # file.copy(fname, file)
+      # file.remove(fname)
       addClass("mask", "hidden")
       removeClass("mask", "overlay")
     }
