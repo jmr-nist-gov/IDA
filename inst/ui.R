@@ -1,9 +1,9 @@
-packs <- c("shiny", "DT", "shinyjs")
-packs_false <- packs[-which(packs %in% installed.packages())]
-if (length(packs_false) > 0) {
-  install.packages(pkgs = packs_false, dependencies = TRUE)
-}
-lapply(packs, library, character.only=TRUE)
+# packs <- c("shiny", "DT", "shinyjs", "ggrepel")
+# packs_false <- packs[-which(packs %in% installed.packages())]
+# if (length(packs_false) > 0) {
+#   install.packages(pkgs = packs_false, dependencies = TRUE)
+# }
+# lapply(packs, library, character.only=TRUE)
 
 instructions <- "instructions.html"
 pastAnalyses <- gsub(".RDS", "",
@@ -31,6 +31,9 @@ shinyUI(
                       .btn {width: 100%;}
                       body {text-align: justify;}
                       .modal-body>btn {width: 49%;}
+                      #quality_controls > .btn {width: 100px; border: 0; padding: 0; color: #337ab7; float: right;}
+                      #quality_controls > .form-group {width: 150px; display: inline-block;}
+                      #quality_controls > .form-group > .checkbox {margin: 0;}
                       .hidden {position: absolute; z-index: 1;}
                       .overlay {position: absolute; z-index: 3; opacity: 0.85; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; background-color: White; color: Black;}
                       .overlay>img {position: absolute; top: 50%; left: 50%; width: 200px; height: 200px; margin-top: -100px; margin-left: -100px; opacity: 1;}
@@ -46,10 +49,10 @@ shinyUI(
       sidebarPanel(
         tagList(
           if(TESTING) {
-          actionButton("inspect", "Inspect App")
+            actionButton("inspect", "Inspect App")
           } else {
-          NULL
-        }),
+            NULL
+          }),
         h4("1. Apply processing values to:"),
         tabsetPanel(id = "apply", type="pills",
                     tabPanel("All",
@@ -126,7 +129,7 @@ shinyUI(
                     tabPanel("Instructions",
                              includeHTML(instructions),
                              img(src="A product of NIST DTD.jpg", align="right")
-                             ), # Close tabPanel "Instructions"
+                    ), # Close tabPanel "Instructions"
                     tabPanel("Results",
                              tabsetPanel(id = "results", type="pills",
                                          tabPanel("Summary Results",
@@ -135,8 +138,14 @@ shinyUI(
                                          tabPanel("Details",
                                                   h4("Quality Overview"),
                                                   p("Selected sample is highlighted with a green diamond."),
+                                                  div(id = "quality_controls",
+                                                      checkboxInput("repel_labels", "Space out labels", value = FALSE),
+                                                      actionButton("zoom_in", "Zoom In", icon = icon("search-plus")),
+                                                      actionButton("zoom_out", "Zoom Out", icon = icon("search-minus"))
+                                                  ),
                                                   plotOutput("IDAquality",
-                                                             click = "click_quality"),
+                                                             click = "click_quality",
+                                                             brush = "brush_quality"),
                                                   hr(),
                                                   h4("Sample Investigation"),
                                                   p("Select a sample or click a point in the quality overview:"),
@@ -170,7 +179,7 @@ shinyUI(
                                          ) # Close tabPanel "Quality Overview"
                              ) # Close tabsetPanel "results"
                     ) # Close tabPanel "Results"
-          ) # Close tabsetPanel "main"
+        ) # Close tabsetPanel "main"
       ) # Close mainPanel
     ) # Close sidebarLayout
   ) # Close fluidPage
