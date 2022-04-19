@@ -1,6 +1,7 @@
 # Isotope Dilution Assistant
 
 _current version 1.0; last updated 20220419_
+
 _previous version 0.9; last updated 20180202_
 
 Preprocessing of data in a consistent, curated manner is a key step toward any data product. Friction occurs often due to the need for balance between automation and expert assessment. One measurement technique that has suffered recently from such friction is time-resolved isotope dilution mass spectrometry (TR-IDMS). This is an analytical method in which the internal standard is an isotope of the same element. It has been classified as a primary higher-order method because of its inherent accuracy and is the method of choice for National Metrology Institutes (NMI) in value assigning Certified Reference Materials (CRM) for trace elements. Quantitation can be accomplished simply by measurement of the equilibrated isotope ratios using a mass spectrometer. The use of IDMS for value assignments at NIST has been declining recently because it requires specialist scientific expertise and involves extensive data processing and calculations, which can be quite labor intensive.
@@ -15,4 +16,14 @@ Updates in Version 1.0 include bug fixes, better feedback, and improved handling
 
 IDA automates the entire process and provides downloads of result data including plots to support report writing. There is limited support for data sets containing unexpected data (e.g. probe failures resulting in data with unanticipated properties).
 
+# Software Disclaimer
 
+NIST-developed software is provided by NIST as a public service. You may use, copy and distribute copies of the software in any medium, provided that you keep intact this entire notice. You may improve, modify and create derivative works of the software or any portion of the software, and you may copy and distribute such modifications or works. Modified works should carry a notice stating that you changed the software and should note the date and nature of any such change. Please explicitly acknowledge the National Institute of Standards and Technology as the source of the software.
+
+NIST-developed software is expressly provided "AS IS." NIST MAKES NO WARRANTY OF ANY KIND, EXPRESS, IMPLIED, IN FACT OR ARISING BY OPERATION OF LAW, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTY OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT AND DATA ACCURACY. NIST NEITHER REPRESENTS NOR WARRANTS THAT THE OPERATION OF THE SOFTWARE WILL BE UNINTERRUPTED OR ERROR-FREE, OR THAT ANY DEFECTS WILL BE CORRECTED. NIST DOES NOT WARRANT OR MAKE ANY REPRESENTATIONS REGARDING THE USE OF THE SOFTWARE OR THE RESULTS THEREOF, INCLUDING BUT NOT LIMITED TO THE CORRECTNESS, ACCURACY, RELIABILITY, OR USEFULNESS OF THE SOFTWARE.
+
+You are solely responsible for determining the appropriateness of using and distributing the software and you assume all risks associated with its use, including but not limited to the risks and costs of program errors, compliance with applicable laws, damage to or loss of data, programs or equipment, and the unavailability or interruption of operation. This software is not intended to be used in any situation where a failure could cause risk of injury or damage to property. The software developed by NIST employees is not subject to copyright protection within the United States.
+
+# Additional Disclaimer
+
+Any mention of commercial products within NIST web pages is for information only; it does not imply recommendation or endorsement by NIST.
