@@ -270,7 +270,7 @@ IDA_quality <- function(dat, repel = FALSE) {
                          "The green line repesents the mean RSD of measurements.",
                          "The green region is -/+1sd of measurements.",
                          "The blue region is 1sd-2sd of measurements.",
-                         "The red line represents the 5% RSD threshold.",
+                         "The red line represents the 5% RSD threshold. Samples > 5% RSD are labeled and colored red.",
                          sep="\n"))+
     theme_classic()
   return(out)
@@ -340,19 +340,19 @@ IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
   return(out)
 }
 
-pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE) {
+pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE, formatter = lubridate::mdy_hms) {
   wb <- createWorkbook()
   addWorksheet(wb, "Summary")
   writeDataTable(wb, 1, IDA_obj$Eval)
   setColWidths(wb, 1, 1:3, widths="auto")
-  print(IDA_obj$Quality+labs(title="Quality Overview"))
-  insertPlot(wb, 1, fileType="tiff", startCol=8, startRow=1)
+  if (length(IDA_obj$Quality) == 2) IDA_obj$Quality <- IDA_obj$Quality[[1]]
+  print(IDA_obj$Quality + labs(title="Quality Overview"))
+  insertPlot(wb, 1, fileType="tiff", startCol=8, startRow=1, width = 8, height = 8)
   addWorksheet(wb, "Processing Values")
   writeDataTable(wb, 2, IDA_obj$Info)
   setColWidths(wb, 2, 1:3, widths="auto")
   for (i in 1:length(IDA_obj$Processed)){
     
-    addWorksheet(wb, as.character(IDA_obj$Eval$Sample[i]))
     raw <- as.data.frame(IDA_obj$Raw[[i]])[, -1]
     names(raw) <- gsub("X", "", names(raw))
     proc <- as.data.frame(IDA_obj$Processed[[i]])
@@ -367,6 +367,17 @@ pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE) {
                   gsub("X", "", names(proc)[2:3]),
                   gsub("X", "", names(raw)))
     names(temp) <- nam_list
+    ws_name <- as.character(IDA_obj$Eval$Sample[i]) %>%
+      str_split("  +") %>%
+      .[[1]]
+    try_format <- suppressWarnings(formatter(ws_name))
+    j <- which(!is.na(try_format))
+    if (length(j) > 0) {
+      ws_name[j] <- as.character(format(try_format[j], "%Y%m%d_%H%M%S"))
+    }
+    ws_name <- str_c(ws_name, collapse = "|") %>%
+      str_trunc(31)
+    addWorksheet(wb, ws_name)
     procAtts <- data.frame(c("Isotope1 Background", "Isotope2 Background", "Stable Time Start", "Stable Time End",
                              "Buffer Size", "RSD Tolerance", "Expansion Size"),
                            as.character(attributes(IDA_obj$Processed[[i]])[1:7]))
@@ -389,7 +400,7 @@ pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE) {
     insertPlot(wb, i+2, fileType="tiff", startCol=1, startRow=20)
     writeDataTable(wb, i+2, procAtts, startCol=10, startRow=1)
     writeDataTable(wb, i+2, temp, startCol=10, startRow=10)
-    setColWidths(wb, i, 1:11, widths="auto")
+    setColWidths(wb, i+2, 1:11, widths="auto")
   }
   return(wb)
 }

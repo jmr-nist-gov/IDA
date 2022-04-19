@@ -15,7 +15,12 @@ shinyServer(function(session, input, output) {
     if (is.null(IDA_result)) {
       return(NULL)
     } else {
-      which(IDA_result$Eval$Sample %in% input$sample)
+      tmp <- which(IDA_result$Eval$Sample %in% input$sample)
+      if (length(tmp) == 1) {
+        return(tmp)
+      } else {
+        return(1)
+      }
     }
   })
   redraw <- reactiveVal(1)
@@ -45,15 +50,53 @@ shinyServer(function(session, input, output) {
   observeEvent(input$fn, {
     is_archived(FALSE)
     analysis_name(tools::file_path_sans_ext(input$fn$name))
+    addClass("processing_mask", "overlay")
+    removeClass("processing_mask", "hidden")
+    tmp <- isolate({
+      IDA(
+        raw_data = input$fn$datapath,
+        buffer = input$buffer_all,
+        tolerance = input$tolerance_all,
+        expansion = input$expansion_all,
+        draw_stable_bounds = FALSE,
+        is_file = TRUE
+      )
+    })
+    tmp$Quality <- list(
+      tmp$Quality,
+      IDA_quality(tmp$Eval, repel = TRUE)
+    )
+    lapply(names(tmp),
+           function(x) {
+             IDA_result[[x]] <- tmp[[x]]
+           })
+    sample_list <- as.vector(IDA_result$Eval$Sample)
+    enable("saveCSVSummary")
+    enable("saveCSVProcVals")
+    enable("saveMSXL")
+    redraw(redraw() + 1)
+    updateTabsetPanel(session,
+                      'main',
+                      selected = "Results")
+    updateTabsetPanel(session,
+                      'results',
+                      selected = "Details")
+    updateSelectInput(session,
+                      "sample",
+                      choices = sample_list,
+                      selected = head(sample_list, 1))
+    addClass("processing_mask", "hidden")
+    removeClass("processing_mask", "overlay")
   })
   
   observeEvent({
-    input$fn
     input$buffer_all
     input$tolerance_all
     input$expansion_all
   }, {
     req(slide_trigger(), any(!is.null(input$fn), is_archived()))
+    addClass("processing_mask", "overlay")
+    removeClass("processing_mask", "hidden")
     use_direct <- !is.null(IDA_result$Raw) || is_archived()
     if (is.null(IDA_result$Raw)) {
       raw_data <- input$fn$datapath
@@ -78,11 +121,6 @@ shinyServer(function(session, input, output) {
            function(x) {
              IDA_result[[x]] <- tmp[[x]]
            })
-    sample_list <- as.vector(IDA_result$Eval$Sample)
-    updateSelectInput(session,
-                      "sample",
-                      choices = sample_list,
-                      selected = head(sample_list, 1))
     updateTabsetPanel(session,
                       'main',
                       selected = "Results")
@@ -104,6 +142,8 @@ shinyServer(function(session, input, output) {
     enable("saveCSVProcVals")
     enable("saveMSXL")
     redraw(redraw() + 1)
+    addClass("processing_mask", "hidden")
+    removeClass("processing_mask", "overlay")
   })
   
   # Single sample parameter update ----
@@ -113,6 +153,8 @@ shinyServer(function(session, input, output) {
     input$expansion_single
   }, {
     req(IDA_result$Processed, slide_trigger())
+    addClass("processing_mask", "overlay")
+    removeClass("processing_mask", "hidden")
     x <- which(IDA_result$Eval$Sample == input$sample)
     # Replace processed, including
     IDA_temp <- IDA_calc(
@@ -146,10 +188,8 @@ shinyServer(function(session, input, output) {
       IDA_quality(IDA_result$Eval, repel = TRUE)
     )
     redraw(redraw() + 1)
-    temp_sample <- isolate(input$sample)
-    updateSelectInput(session,
-                      "sample",
-                      selected = temp_sample)
+    addClass("processing_mask", "hidden")
+    removeClass("processing_mask", "overlay")
   })
   
   # Update outputs ----
@@ -417,6 +457,8 @@ shinyServer(function(session, input, output) {
   # Load from archive ----
   observeEvent(load_archive(), {
     req(load_archive() > 0)
+    addClass("processing_mask", "overlay")
+    removeClass("processing_mask", "hidden")
     fname <- paste0(input$pastSamples[1], ".RDS")
     analysis_name(tools::file_path_sans_ext(fname))
     archive <- readRDS(file.path(getwd(), "archive", fname))
@@ -454,6 +496,8 @@ shinyServer(function(session, input, output) {
     redrawit <- redraw() + 1
     redraw(redrawit)
     is_archived(TRUE)
+    addClass("processing_mask", "hidden")
+    removeClass("processing_mask", "overlay")
   })
   
   # Archive the current analysis ----
@@ -565,13 +609,16 @@ shinyServer(function(session, input, output) {
       paste0(analysis_name(), " - processed ", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      addClass("mask", "overlay")
-      removeClass("mask", "hidden")
-      saveWorkbook(pack_as_excel(IDA_result, draw_stable_bounds=TRUE), file, overwrite = TRUE)
-      # file.copy(fname, file)
-      # file.remove(fname)
-      addClass("mask", "hidden")
-      removeClass("mask", "overlay")
+      addClass("download_mask", "overlay")
+      removeClass("download_mask", "hidden")
+      IDA_result %>%
+        reactiveValuesToList() %>%
+        pack_as_excel(draw_stable_bounds=TRUE) %>%
+        saveWorkbook("tmp", overwrite = TRUE)
+      file.copy("tmp", file)
+      file.remove("tmp")
+      addClass("download_mask", "hidden")
+      removeClass("download_mask", "overlay")
     }
   )
 }) 
