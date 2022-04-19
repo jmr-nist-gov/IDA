@@ -9,7 +9,7 @@ This data processing tool was constructed to directly address the time-consuming
 
 `git clone https://gitlab.nist.gov/gitlab/jmr3/IDA.git`
 
-Open the project "IDA" in RStudio. Open one of `global.R`, `ui.R`, or `server.R` within the `inst` directory. If your version of RStudio supports launching Shiny apps, there will be a "Run App" button toward the top right of the panel containing the opened file. IDA will verify you have the packages necessary to run. Full instructions are provided in the app, or see the [instructions page](instructions.html). An [example data file](inst/SRM 2778.csv) is provided that can also be loaded directly in the application.
+Open the project "IDA" in RStudio. Open one of `global.R`, `ui.R`, or `server.R` within the `inst` directory. If your version of RStudio supports launching Shiny apps, there will be a "Run App" button toward the top right of the panel containing the opened file. IDA will verify you have the packages necessary to run. Full instructions are provided in the app, or see the [instructions page](inst/instructions.html). An [example data file](inst/SRM 2778.csv) is provided that can also be loaded directly in the application.
 
 Updates in Version 1.0 include bug fixes, better feedback, and improved handling of archival data sets.
 
