@@ -3,8 +3,7 @@ title: Isotope Dilution Assistant (IDA)
 message: Please cite this software using these metadata.
 type: software
 authors:
-  - given-names: Jared
-    name-particle: M
+  - given-names: Jared M
     family-names: Ragland
     email: jared.ragland@nist.gov
     affiliation: NIST
