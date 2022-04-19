@@ -43,7 +43,7 @@ shinyUI(
     ),
     
     # Application title
-    titlePanel("Isotope Dilution Assistant v0.9"),
+    titlePanel("Isotope Dilution Assistant v1.0")),
     
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
