@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: Isotope Dilution Assistant (IDA)
+message: Please cite this software using these metadata.
+type: software
+authors:
+  - given-names: Jared
+    name-particle: M
+    family-names: Ragland
+    email: jared.ragland@nist.gov
+    affiliation: NIST
+    orcid: 'https://orcid.org/0000-0002-8055-2432'
+repository-code: 'https://github.com/jmr-nist-gov/IDA'
+keywords:
+  - isotope dilution
+  - mass spectrometry
+  - inorganic analysis
+  - workflow
+  - shiny
+  - time-resolved isotope dilution
+commit: >-
+  https://github.com/jmr-nist-gov/IDA/commit/e34baddeee76e5de2beaf95ab2d918c5c81edafa
+version: '1.0'
+date-released: '2022-04-19'
