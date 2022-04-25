@@ -1,6 +1,7 @@
 # Isotope Dilution Assistant
 
-_current version 1.0; last updated 20220419_
+_current version 1.0; last updated 20220425_
+
 _previous version 0.9; last updated 20180202_
 
 Preprocessing of data in a consistent, curated manner is a key step toward any data product. Friction occurs often due to the need for balance between automation and expert assessment. One measurement technique that has suffered recently from such friction is time-resolved isotope dilution mass spectrometry (TR-IDMS). This is an analytical method in which the internal standard is an isotope of the same element. It has been classified as a primary higher-order method because of its inherent accuracy and is the method of choice for National Metrology Institutes (NMI) in value assigning Certified Reference Materials (CRM) for trace elements. Quantitation can be accomplished simply by measurement of the equilibrated isotope ratios using a mass spectrometer. The use of IDMS for value assignments at NIST has been declining recently because it requires specialist scientific expertise and involves extensive data processing and calculations, which can be quite labor intensive.
