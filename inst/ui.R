@@ -21,8 +21,6 @@ if (is.null(pastAnalyses)){
 
 shinyUI(
   fluidPage(
-    div(id="download_mask", class="hidden", height = "calc(100vh)", img(src="processing.gif"), h3("Building .xlsx file...")),
-    div(id="processing_mask", class="hidden", height = "calc(100vh)", img(src="processing.gif")),
     useShinyjs(),
     tags$head(
       tags$style(HTML("
@@ -36,11 +34,13 @@ shinyUI(
                       #quality_controls > .form-group {width: 150px; display: inline-block;}
                       #quality_controls > .form-group > .checkbox {margin: 0;}
                       .hidden {position: absolute; z-index: 1;}
-                      .overlay {position: absolute; z-index: 3; opacity: 0.85; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; background-color: White; color: Black;}
-                      .overlay>img {position: absolute; top: 50%; left: 50%; width: 200px; height: 200px; margin-top: -100px; margin-left: -100px; opacity: 1;}
-                      .overlay>h3 {position: absolute; top: 50%; left: 50%; width: 200px; height: 200px;; margin-top: 100px; margin-left: -100px; color: Black; opacity: 1; text-align: center}
+                      .overlay {position: fixed; z-index: 3; opacity: 0.85; top: 0; left: 0; width: 100%; height: 100%; background-color: White; color: Black;}
+                      .overlay>img {position: fixed; top: calc(50vh - 150px); left: calc(50vw - 100px); width: 200px; height: 200px; opacity: 1;}
+                      .overlay>h3 {position: fixed; top: calc(50vh + 20px); left: calc(50vw - 100px); width: 200px; color: Black; opacity: 1; text-align: center}
                       "))
     ),
+    div(id="download_mask", class="hidden", img(src="processing.gif"), h3("Building .xlsx file...")),
+    div(id="processing_mask", class="hidden", img(src="processing.gif")),
     
     # Application title
     titlePanel("Isotope Dilution Assistant v1.0"),
