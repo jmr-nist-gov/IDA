@@ -146,10 +146,10 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
          title = sample_run,
          subtitle = isotope_label)+
     theme_classic()+
-    scale_y_continuous(labels = scientific_format(digits=2))
+    scale_y_continuous(labels = label_scientific(digits=2))
   if (packageVersion("scales") >= 1.2) {
     signal <- signal +
-      scale_x_continuous(labels = label_number(scale = 0.001), n.breaks = 10)
+      scale_x_continuous(labels = label_number(scale = 0.001, big.mark = ","), n.breaks = 10)
   }
   if (draw_stable_bounds){
     signal <- signal+
@@ -167,16 +167,16 @@ IDA_graphs <- function(dat_raw, dat_rat, sample_run, isotopes, draw_stable_bound
   
   # Create ratio plot
   ratios <- dat_rat %>% 
-    ggplot(aes(x = Time, y = Ratio))+
+    ggplot(aes(x = Time, y = round(Ratio, 3)))+
     geom_line()+
     labs(x = "Time (s)",
          y = paste("Signal Ratio", isotopes))+
     coord_cartesian(ylim=y_range)+
     theme_classic()+
-    scale_y_continuous(labels=scientific_format(digits=2))
+    scale_y_continuous(labels = label_scientific(digits=2))
   if (packageVersion("scales") >= 1.2) {
     ratios <- ratios +
-    scale_x_continuous(labels = label_number(scale = 0.001), n.breaks = 10)
+    scale_x_continuous(labels = label_number(scale = 0.001, big.mark = ","), n.breaks = 10)
   }
   if (draw_stable_bounds){
     ratios <- ratios+
@@ -317,10 +317,6 @@ IDA <- function(raw_data, buffer = 10, tolerance = 0.1, expansion = 10, draw_sta
   names(full) <- names(dat)
   names(graphs) <- names(dat)
   
-  # samples <- as.data.frame(strsplit(names(dat), "    "), row.names=NULL, stringsAsFactors=FALSE)
-  # names(samples) <- c()
-  # samples <- as.data.frame(t(samples))
-  # names(samples) <- c("Sample", "DateTime", "Run")
   samples <- data.frame(Sample = names(dat))
   out <- out[-1,]
   info <- info[-1,]
@@ -376,7 +372,8 @@ pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE, formatter = lubri
       ws_name[j] <- as.character(format(try_format[j], "%Y%m%d_%H%M%S"))
     }
     ws_name <- str_c(ws_name, collapse = "|") %>%
-      str_trunc(31)
+      str_trunc(31) %>%
+      str_remove_all("\\(|\\)|:")
     addWorksheet(wb, ws_name)
     procAtts <- data.frame(c("Isotope1 Background", "Isotope2 Background", "Stable Time Start", "Stable Time End",
                              "Buffer Size", "RSD Tolerance", "Expansion Size"),
@@ -384,16 +381,16 @@ pack_as_excel <- function(IDA_obj, draw_stable_bounds = FALSE, formatter = lubri
     names(procAtts) <- c("Processing Attribute", "Value")
     if (draw_stable_bounds) {
       print(IDA_obj$Graphs[[i]]$Signal+
-              geom_vline(xintercept=IDA_obj$Info[i,6], colour='red')+
-              geom_vline(xintercept=IDA_obj$Info[i,7], colour='red'))
+              geom_vline(xintercept=IDA_obj$Info$`Stable Time Start`[i], colour='red')+
+              geom_vline(xintercept=IDA_obj$Info$`Stable Time End`[i], colour='red'))
     } else {
       print(IDA_obj$Graphs[[i]]$Signal)
     }
     insertPlot(wb, i+2, fileType="tiff", startCol=1, startRow=1)
     if (draw_stable_bounds) {
       print(IDA_obj$Graphs[[i]]$Ratio+
-              geom_vline(xintercept=IDA_obj$Info[i,6], colour='red')+
-              geom_vline(xintercept=IDA_obj$Info[i,7], colour='red'))
+              geom_vline(xintercept=IDA_obj$Info$`Stable Time Start`[i], colour='red')+
+              geom_vline(xintercept=IDA_obj$Info$`Stable Time End`[i], colour='red'))
     } else {
       print(IDA_obj$Graphs[[i]]$Ratio)
     }
