@@ -6,6 +6,7 @@
 # lapply(packs, library, character.only=TRUE)
 
 instructions <- "instructions.html"
+disclaimer   <- "disclaimer.html"
 pastAnalyses <- gsub(".RDS", "",
                      list.files(
                        path = file.path(getwd(), "archive"),
@@ -37,6 +38,12 @@ shinyUI(
                       .overlay {position: fixed; z-index: 3; opacity: 0.85; top: 0; left: 0; width: 100%; height: 100%; background-color: White; color: Black;}
                       .overlay>img {position: fixed; top: calc(50vh - 150px); left: calc(50vw - 100px); width: 200px; height: 200px; opacity: 1;}
                       .overlay>h3 {position: fixed; top: calc(50vh + 20px); left: calc(50vw - 100px); width: 200px; color: Black; opacity: 1; text-align: center}
+                      #dtd_logo {float: left; text-align: left;}
+                      #dtd_logo > p {margin-bottom: 0; font-size: xx-small;}
+                      #dtd_logo > img {height: 36px; margin-bottom: 5px;}
+                      #dtd_logo p:first-child {color: #337ab7; font-size: small;}
+                      #dtd_contact_disclaimer {float: right; text-align: right;}
+                      #dtd_contact_disclaimer > p {font-size: small;}
                       "))
     ),
     div(id="download_mask", class="hidden", img(src="processing.gif"), h3("Building .xlsx file...")),
@@ -129,7 +136,26 @@ shinyUI(
         tabsetPanel(id = "main",
                     tabPanel("Instructions",
                              includeHTML(instructions),
-                             img(src="A product of NIST DTD.jpg", align="right")
+                             div(id = "dtd_contact_disclaimer",
+                                 p(id = "contact",
+                                   "Please direct any questions to ",
+                                   a(href = "mailto::jared.ragland@nist.gov",
+                                     "jared.ragland@nist.gov")),
+                                 p(id = "disclaimer",
+                                   "This software published under the ",
+                                   a(href = "https://www.nist.gov/disclaimer",
+                                     "NIST Software Disclaimer"))
+                             ),
+                             div(id = "dtd_logo",
+                                 p("A data tool product from"),
+                                 img(src="nist_logo.png"),
+                                 # p("U.S. Department of Commerce"),
+                                 # p("National Institute of Standards and Technology"),
+                                 p("Material Measurement Laboratory"),
+                                 p("Chemical Sciences Division"),
+                                 p("Chemical Informatics Group")
+                             )
+                             # img(src="A product of NIST DTD.png", align="right")
                     ), # Close tabPanel "Instructions"
                     tabPanel("Results",
                              tabsetPanel(id = "results", type="pills",
