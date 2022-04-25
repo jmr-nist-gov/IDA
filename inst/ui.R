@@ -21,8 +21,8 @@ if (is.null(pastAnalyses)){
 
 shinyUI(
   fluidPage(
-    div(id="download_mask", class="hidden", img(src="processing.gif"), h3("Building .xlsx file...")),
-    div(id="processing_mask", class="hidden", img(src="processing.gif")),
+    div(id="download_mask", class="hidden", height = "calc(100vh)", img(src="processing.gif"), h3("Building .xlsx file...")),
+    div(id="processing_mask", class="hidden", height = "calc(100vh)", img(src="processing.gif")),
     useShinyjs(),
     tags$head(
       tags$style(HTML("
