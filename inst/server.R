@@ -8,6 +8,8 @@ shinyServer(function(session, input, output) {
     if (recorder_exists) {
       source(recorder)
       recorder_active <- can_record()
+    } else {
+      recorder_active <- FALSE
     }
     rm(recorder, recorder_exists)
   }
