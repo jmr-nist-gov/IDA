@@ -200,7 +200,13 @@ shinyServer(function(session, input, output) {
         if (is.null(IDA_result$Eval)) {
           NULL
         } else {
-          full_join(IDA_result$Eval, IDA_result$Info)
+          # full_join(IDA_result$Eval, IDA_result$Info)
+          DT::datatable(
+            data = full_join(IDA_result$Eval, IDA_result$Info) |>
+              mutate(across(c(Mean, StDev, RSD), ~ round(.x, digits = 4))),
+            rownames = FALSE,
+            extensions = c("Responsive")
+          )
         }
       })
       if(input$sample %in% IDA_result$Eval$Sample){

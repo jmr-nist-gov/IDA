@@ -42,15 +42,15 @@ shinyUI(
                       #dtd_logo > p {margin-bottom: 0; font-size: xx-small;}
                       #dtd_logo > img {height: 36px; margin-bottom: 5px;}
                       #dtd_logo p:first-child {color: #337ab7; font-size: small;}
-                      #dtd_contact_disclaimer {float: right; text-align: right;}
-                      #dtd_contact_disclaimer > p {font-size: small;}
+                      #dtd_contact_disclaimer {float: right; text-align: right; max-width: 200px;}
+                      #dtd_contact_disclaimer > * {font-size: small;}
                       "))
     ),
     div(id="download_mask", class="hidden", img(src="processing.gif"), h3("Building .xlsx file...")),
     div(id="processing_mask", class="hidden", img(src="processing.gif")),
     
     # Application title
-    titlePanel("Isotope Dilution Assistant v1.0"),
+    titlePanel("Isotope Dilution Assistant"),
     
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
@@ -136,16 +136,6 @@ shinyUI(
         tabsetPanel(id = "main",
                     tabPanel("Instructions",
                              includeHTML(instructions),
-                             div(id = "dtd_contact_disclaimer",
-                                 p(id = "contact",
-                                   "Please direct any questions to ",
-                                   a(href = "mailto::jared.ragland@nist.gov",
-                                     "jared.ragland@nist.gov")),
-                                 p(id = "disclaimer",
-                                   "This software published under the ",
-                                   a(href = "https://www.nist.gov/disclaimer",
-                                     "NIST Software Disclaimer"))
-                             ),
                              div(id = "dtd_logo",
                                  p("A data tool product from"),
                                  img(src="nist_logo.png"),
@@ -154,6 +144,17 @@ shinyUI(
                                  p("Material Measurement Laboratory"),
                                  p("Chemical Sciences Division"),
                                  p("Chemical Informatics Group")
+                             ),
+                             div(id = "dtd_contact_disclaimer",
+                                 p(tags$strong("IDA v1.0.1, last updated on 2023-10-18")),
+                                 p(id = "contact",
+                                   "Please direct any questions to ",
+                                   a(href = "mailto::jared.ragland@nist.gov?subject=[IDA] Question",
+                                     "jared.ragland@nist.gov")),
+                                 p(id = "disclaimer",
+                                   "This software published under the ",
+                                   a(href = "https://www.nist.gov/disclaimer",
+                                     "NIST Software Disclaimer"))
                              )
                              # img(src="A product of NIST DTD.png", align="right")
                     ), # Close tabPanel "Instructions"
@@ -161,6 +162,7 @@ shinyUI(
                              tabsetPanel(id = "results", type="pills",
                                          tabPanel("Summary Results",
                                                   br(),
+                                                  p("Display of Mean, StDev, and RSD values has been truncated to four decimal places. Full precision values will be available in the download."),
                                                   DT::dataTableOutput("IDAsummary")),
                                          tabPanel("Details",
                                                   h4("Quality Overview"),
