@@ -1,6 +1,36 @@
 # Server function ----
 shinyServer(function(session, input, output) {
-  
+  # History Bot ----
+  track_history     <- TRUE
+  if (track_history) {
+    recorder <- file.path(dirname(here::here()), "app_history", "recorder.R")
+    recorder_exists <- file.exists(recorder)
+    if (recorder_exists) {
+      source(recorder)
+      recorder_active <- can_record()
+    }
+    rm(recorder, recorder_exists)
+  }
+  if (!TESTING && recorder_active) {
+    suppressWarnings(
+      write_history(
+        un    = Sys.getenv("mongo_un_bot"),
+        app   = "IDA",
+        event = "session_start"
+      )
+    )
+  }
+  onSessionEnded(function() {
+    if (!TESTING && recorder_active) {
+      suppressWarnings(
+        write_history(
+          un    = Sys.getenv("mongo_un_bot"),
+          app   = "IDA",
+          event = "session_end"
+        )
+      )
+    }
+  })
   # Inputs ----
   file_selected     <- reactive(input$fn)
   analysis_name     <- reactiveVal(NULL)
