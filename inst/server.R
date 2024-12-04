@@ -18,7 +18,8 @@ shinyServer(function(session, input, output) {
       write_history(
         un    = Sys.getenv("mongo_un_bot"),
         app   = "IDA",
-        event = "session_start"
+        event = "session_start",
+        session_id = session$token
       )
     )
   }
@@ -28,7 +29,8 @@ shinyServer(function(session, input, output) {
         write_history(
           un    = Sys.getenv("mongo_un_bot"),
           app   = "IDA",
-          event = "session_end"
+          event = "session_end",
+          session_id = session$token
         )
       )
     }
