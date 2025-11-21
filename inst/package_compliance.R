@@ -5,7 +5,7 @@ packs_false <- packs[-which(packs %in% installed.packages())]
 if (length(packs_false) > 0) {
   install.packages(pkgs = packs_false, dependencies = TRUE)
 }
-if (packageVersion("scales") < 1.2) {
+if (packageVersion("scales") < "1.2") {
   install.packages("scales")
 }
 lapply(packs, library, character.only = TRUE)

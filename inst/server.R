@@ -1,6 +1,40 @@
 # Server function ----
 shinyServer(function(session, input, output) {
-  
+  # History Bot ----
+  track_history     <- TRUE
+  if (track_history) {
+    recorder <- file.path(dirname(here::here()), "app_history", "recorder.R")
+    recorder_exists <- file.exists(recorder)
+    if (recorder_exists) {
+      source(recorder)
+      recorder_active <- can_record()
+    } else {
+      recorder_active <- FALSE
+    }
+    rm(recorder, recorder_exists)
+  }
+  if (!TESTING && recorder_active) {
+    suppressWarnings(
+      write_history(
+        un    = Sys.getenv("mongo_un_bot"),
+        app   = "IDA",
+        event = "session_start",
+        session_id = session$token
+      )
+    )
+  }
+  onSessionEnded(function() {
+    if (!TESTING && recorder_active) {
+      suppressWarnings(
+        write_history(
+          un    = Sys.getenv("mongo_un_bot"),
+          app   = "IDA",
+          event = "session_end",
+          session_id = session$token
+        )
+      )
+    }
+  })
   # Inputs ----
   file_selected     <- reactive(input$fn)
   analysis_name     <- reactiveVal(NULL)
@@ -200,7 +234,13 @@ shinyServer(function(session, input, output) {
         if (is.null(IDA_result$Eval)) {
           NULL
         } else {
-          full_join(IDA_result$Eval, IDA_result$Info)
+          # full_join(IDA_result$Eval, IDA_result$Info)
+          DT::datatable(
+            data = full_join(IDA_result$Eval, IDA_result$Info) |>
+              mutate(across(c(Mean, StDev, RSD), ~ round(.x, digits = 4))),
+            rownames = FALSE,
+            extensions = c("Responsive")
+          )
         }
       })
       if(input$sample %in% IDA_result$Eval$Sample){
